@@ -87,3 +87,12 @@ backend/.env
 frontend/.env.local
 frontend/.env.production
 abi-pricing-edgeone.zip
+-e 
+# Environment and credential files
+.env
+.env.*
+*.env
+credentials.json
+*.pem
+*.key
+.credentials
