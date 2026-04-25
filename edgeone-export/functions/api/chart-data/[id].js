@@ -1,10 +1,10 @@
-import { json, corsPreflight, readAll, ensureSeeded } from "../_shared.js";
+import { json, corsPreflight, readAll, ensureSeeded, safe } from "../_shared.js";
 
 export async function onRequestOptions() { return corsPreflight(); }
 
-export async function onRequestGet({ env, params }) {
+export const onRequestGet = safe(async ({ env, params }) => {
   await ensureSeeded(env);
-  const categoryId = params.id;
+  const categoryId = params && params.id;
   const { items, prices } = await readAll(env);
   const catItems = items.filter((it) => it.category_id === categoryId);
   if (catItems.length === 0) return json({ items: [], rows: [] });
@@ -18,4 +18,4 @@ export async function onRequestGet({ env, params }) {
   }
   const rows = Array.from(dateMap.values()).sort((a, b) => a.date.localeCompare(b.date));
   return json({ items: catItems, rows });
-}
+});

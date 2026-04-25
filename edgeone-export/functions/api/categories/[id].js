@@ -1,11 +1,11 @@
-import { json, corsPreflight, readList, writeList, requireAdmin, KV_KEYS } from "../_shared.js";
+import { json, corsPreflight, readList, writeList, requireAdmin, KV_KEYS, safe } from "../_shared.js";
 
 export async function onRequestOptions() { return corsPreflight(); }
 
-export async function onRequestDelete({ request, env, params }) {
+export const onRequestDelete = safe(async ({ request, env, params }) => {
   const unauth = requireAdmin(request, env);
   if (unauth) return unauth;
-  const id = params.id;
+  const id = params && params.id;
   const [cats, items, prices] = await Promise.all([
     readList(env, KV_KEYS.CATEGORIES),
     readList(env, KV_KEYS.ITEMS),
@@ -23,4 +23,4 @@ export async function onRequestDelete({ request, env, params }) {
     writeList(env, KV_KEYS.PRICES, newPrices),
   ]);
   return json({ ok: true });
-}
+});

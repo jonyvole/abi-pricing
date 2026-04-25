@@ -1,4 +1,4 @@
-import { json, corsPreflight, requireAdmin } from "./_shared.js";
+import { json, corsPreflight, requireAdmin, safe } from "./_shared.js";
 
 const DEFAULT_SETTINGS = {
   footer_title: "ABI Pricing Through Time",
@@ -12,15 +12,18 @@ const KEY = "settings";
 
 export async function onRequestOptions() { return corsPreflight(); }
 
-export async function onRequestGet({ env }) {
+export const onRequestGet = safe(async ({ env }) => {
   if (!env || !env.PRICING_KV) return json(DEFAULT_SETTINGS);
   const stored = await env.PRICING_KV.get(KEY, { type: "json" });
   return json({ ...DEFAULT_SETTINGS, ...(stored || {}) });
-}
+});
 
-export async function onRequestPut({ request, env }) {
+export const onRequestPut = safe(async ({ request, env }) => {
   const unauth = requireAdmin(request, env);
   if (unauth) return unauth;
+  if (!env || !env.PRICING_KV) {
+    return json({ detail: "KV namespace 'PRICING_KV' not bound" }, 500);
+  }
   let body;
   try { body = await request.json(); } catch { return json({ detail: "Invalid JSON" }, 400); }
   const merged = {
@@ -32,4 +35,14 @@ export async function onRequestPut({ request, env }) {
   };
   await env.PRICING_KV.put(KEY, JSON.stringify(merged));
   return json(merged);
-}
+});
+
+// Some EdgeOne setups don't dispatch PUT to onRequestPut. Provide onRequest
+// fallback that routes by method and also accepts POST for older runtimes.
+export const onRequest = safe(async (ctx) => {
+  const m = ctx.request.method.toUpperCase();
+  if (m === "OPTIONS") return corsPreflight();
+  if (m === "GET") return onRequestGet(ctx);
+  if (m === "PUT" || m === "POST") return onRequestPut(ctx);
+  return json({ detail: `Method ${m} not allowed` }, 405);
+});

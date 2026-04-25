@@ -35,7 +35,7 @@ export const KV_KEYS = {
 const JSON_HEADERS = {
   "Content-Type": "application/json; charset=utf-8",
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, X-Admin-Token",
 };
 
@@ -44,6 +44,23 @@ export function json(data, status = 200, extra = {}) {
     status,
     headers: { ...JSON_HEADERS, ...extra },
   });
+}
+
+// Wrap a handler so any thrown exception is returned as JSON instead of 545.
+export function safe(handler) {
+  return async (ctx) => {
+    try {
+      return await handler(ctx);
+    } catch (e) {
+      const msg = (e && (e.stack || e.message)) ? String(e.stack || e.message) : String(e);
+      return json({
+        detail: "Edge function exception",
+        error: msg.slice(0, 2000),
+        kv_bound: !!(ctx && ctx.env && ctx.env.PRICING_KV),
+        admin_set: !!(ctx && ctx.env && ctx.env.ADMIN_PASSWORD),
+      }, 500);
+    }
+  };
 }
 
 export function corsPreflight() {
@@ -111,7 +128,7 @@ export function requireAdmin(request, env) {
 // ---- Seed ----
 export async function ensureSeeded(env) {
   const kv = getKV(env);
-  const seeded = await kv.get(KV_KEYS.SEEDED);
+  const seeded = await kv.get(KV_KEYS.SEEDED, { type: "text" });
   if (seeded === "1") return false;
   const existing = await readList(env, KV_KEYS.CATEGORIES);
   if (existing.length > 0) {

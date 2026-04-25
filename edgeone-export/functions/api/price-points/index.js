@@ -1,19 +1,19 @@
-import { json, corsPreflight, readList, writeList, requireAdmin, uuid, nowIso, KV_KEYS } from "../_shared.js";
+import { json, corsPreflight, readList, writeList, requireAdmin, uuid, nowIso, KV_KEYS, safe } from "../_shared.js";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function onRequestOptions() { return corsPreflight(); }
 
-export async function onRequestGet({ request, env }) {
+export const onRequestGet = safe(async ({ request, env }) => {
   const url = new URL(request.url);
   const itemId = url.searchParams.get("item_id");
   const all = await readList(env, KV_KEYS.PRICES);
   const filtered = itemId ? all.filter((p) => p.item_id === itemId) : all;
   filtered.sort((a, b) => a.date.localeCompare(b.date));
   return json(filtered);
-}
+});
 
-export async function onRequestPost({ request, env }) {
+export const onRequestPost = safe(async ({ request, env }) => {
   const unauth = requireAdmin(request, env);
   if (unauth) return unauth;
   let body;
@@ -37,4 +37,4 @@ export async function onRequestPost({ request, env }) {
   }
   await writeList(env, KV_KEYS.PRICES, prices);
   return json(entry);
-}
+});
