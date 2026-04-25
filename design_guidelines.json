@@ -1,0 +1,102 @@
+{
+  "theme": "dark",
+  "archetype": "2_performance_pro",
+  "domain": "Gaming / Tactical Data Dashboard",
+  "core_philosophy": "Tactical Minimalism. E1's approach strictly avoids 'fintech-bro' gradients and soft shadows. The UI must feel like a military command center tracking high-stakes assets. Data is paramount. 1px stark borders, high-contrast typography, and purely functional color usage.",
+  "colors": {
+    "background": "#08090A",
+    "surface_1": "#121417",
+    "surface_2": "#1B1D22",
+    "primary": "#FFB300",
+    "primary_hover": "#E6A200",
+    "accent_positive": "#4CAF50",
+    "accent_negative": "#FF3B30",
+    "text_primary": "#FFFFFF",
+    "text_secondary": "#8A8F98",
+    "border": "#272A30"
+  },
+  "typography": {
+    "fonts": {
+      "heading": "Chivo",
+      "body": "IBM Plex Sans",
+      "mono": "IBM Plex Mono"
+    },
+    "scale": {
+      "h1": "text-4xl sm:text-5xl tracking-tighter uppercase font-black",
+      "h2": "text-2xl sm:text-3xl tracking-tight uppercase font-bold",
+      "h3": "text-xl font-bold uppercase",
+      "body": "text-sm sm:text-base leading-relaxed",
+      "data_label": "text-xs tracking-[0.2em] uppercase font-bold text-[#8A8F98]",
+      "price": "font-mono text-lg sm:text-xl font-medium"
+    }
+  },
+  "layout_and_spacing": {
+    "spacing_scale": "Dense and compact for the dashboard (p-4 to p-6), generous for the hero/landing areas (p-12 to p-24).",
+    "grid_strategy": "MODE B: The 'Control Room' Grid. Strict hierarchy. grid-cols-1 md:grid-cols-4 lg:grid-cols-12. Sharp corners, gap-4 to gap-6. Every pixel utilized. No jagged bottoms.",
+    "surface_strategy": "Grid Borders (The 'Technical' Look). Expose the skeleton. Container uses border-collapse layout style, child cards have 1px solid borders border-[#272A30]. No soft glassmorphism. Flat solid surfaces only.",
+    "radius": "rounded-none or rounded-sm (max 2px). Brutalist, tactical feel."
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-[#FFB300] text-[#08090A] hover:bg-[#E6A200] font-bold uppercase tracking-wide rounded-none border border-transparent transition-colors",
+      "secondary": "bg-transparent text-white border border-[#272A30] hover:border-[#FFB300] hover:text-[#FFB300] font-bold uppercase rounded-none transition-colors",
+      "danger": "bg-transparent text-[#FF3B30] border border-[#FF3B30]/30 hover:bg-[#FF3B30] hover:text-white transition-colors"
+    },
+    "cards": {
+      "default": "bg-[#121417] border border-[#272A30] rounded-none p-4 sm:p-6"
+    },
+    "charts": {
+      "library": "recharts",
+      "styling": "Dark theme configured. Grid lines must be dashed and extremely subtle (#272A30). Line colors should use Primary (#FFB300) and White. Tooltips must be custom styled with IBM Plex Mono font, bg-[#08090A], 1px border-[#FFB300]."
+    },
+    "navigation": {
+      "style": "Vertical sidebar on desktop, sticky bottom or hamburger on mobile. Sidebar contains categories (Helmets, Masks, Body Armour, etc.) with sharp hover states (left border highlight)."
+    },
+    "tables": {
+      "style": "Data-heavy. Use Shadcn Table. No row background colors by default, hover state is bg-[#1B1D22]. Monospace font for all price columns."
+    }
+  },
+  "specific_features": {
+    "jonyvole_banner": {
+      "requirement": "Must preserve JonyVole creator code banner.",
+      "implementation": "Do not hide this. It should be a persistent, high-contrast banner either pinned to the top of the dashboard or forming a prominent 'Bento' box in the grid. Background: dark olive/camo texture with overlay. Text: 'USE CREATOR CODE: JONYVOLE'. Click-through: https://www.arenabreakoutinfinite.com/creatorcode/index.html?codeid=JonyVole. Use heavy yellow accenting to draw the eye."
+    },
+    "admin_panel": {
+      "design": "Password gated. Uses the exact same UI language but with added 'Action' columns (Edit/Delete). Add Data forms should use heavily customized Shadcn inputs (square, focus:border-[#FFB300])."
+    }
+  },
+  "media": {
+    "images": [
+      {
+        "category": "hero_background",
+        "url": "https://images.pexels.com/photos/29561690/pexels-photo-29561690.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Tactical soldier aiming. Use with heavy opacity overlay (bg-black/80) to serve as the atmospheric background for the landing page or login screen."
+      },
+      {
+        "category": "category_helmets",
+        "url": "https://images.unsplash.com/photo-1677030041879-24c9e2cc55e5?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "description": "Tactical helmet sitting on shelf, to be used as thumbnail for the Helmets category."
+      },
+      {
+        "category": "category_ammo",
+        "url": "https://images.pexels.com/photos/9714417/pexels-photo-9714417.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Stacked military ammunition containers, to be used as thumbnail for the Ammo category."
+      }
+    ],
+    "icons": {
+      "library": "lucide-react"
+    }
+  },
+  "interactions": {
+    "hover_states": "Hard cuts. No soft fading. A hover state should instantly change a 1px border to #FFB300 or swap background colors. Focus states must have a 2px sharp ring of #FFB300 offset by 2px of #08090A.",
+    "testing": "All interactive elements MUST have data-testid attributes (e.g., data-testid='category-tab-helmets')."
+  },
+  "instructions_to_main_agent": [
+    "Strictly adhere to the E1 tactical minimalism approach. Do NOT introduce purple, teal, or soft gradients.",
+    "Ensure the Recharts graphs use the IBM Plex Mono font for axis ticks and tooltips to maintain the 'data terminal' aesthetic.",
+    "Implement the JonyVole banner exactly as requested: clickable to the provided URL, highly visible, matching the gritty military theme.",
+    "Use raw HTML/Tailwind for structural layout (grid-cols-*, gap-*, border-collapse) and customized Shadcn components for complex interactions (Tables, Modals for Admin, Selects).",
+    "Avoid border-radius. Max rounded-sm everywhere.",
+    "All prices should be styled with a monospace font."
+  ]
+}
