@@ -35,8 +35,9 @@ edgeone-export/
         │   ├── index.js             GET, POST  /api/price-points
         │   ├── bulk.js              POST       /api/price-points/bulk
         │   └── [id].js              DELETE     /api/price-points/:id
-        └── chart-data/
-            └── [id].js              GET        /api/chart-data/:id
+        ├── chart-data/
+        │   └── [id].js              GET        /api/chart-data/:id
+        └── settings.js              GET, PUT   /api/settings (footer text)
 ```
 
 ---
@@ -83,6 +84,8 @@ https://<your-project>.edgeone.app/api/seed
 ```
 
 After that, log in at `/admin` with your `ADMIN_PASSWORD`, delete the sample data and add your real prices.
+
+The footer text ("Track in-game prices. Stay informed. Use creator code JonyVole.") is now editable from the **Site Settings (Footer)** card in the admin panel — no code change or rebuild needed. Five fields: title label, text-before-link, link label, link URL, text-after-link. Save → the public site updates instantly (KV is eventually consistent, may take ~60s).
 
 ---
 

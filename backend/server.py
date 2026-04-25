@@ -77,6 +77,17 @@ class AdminLogin(BaseModel):
     password: str
 
 
+class SiteSettings(BaseModel):
+    footer_title: str = "ABI Pricing Through Time"
+    footer_text_before: str = "Track in-game prices. Stay informed. Use creator code "
+    footer_link_label: str = "JonyVole"
+    footer_link_url: str = "https://www.arenabreakoutinfinite.com/creatorcode/index.html?codeid=JonyVole"
+    footer_text_after: str = "."
+
+
+DEFAULT_SETTINGS = SiteSettings().model_dump()
+
+
 # ----- Auth dependency -----
 def require_admin(x_admin_token: Optional[str] = Header(None)):
     if x_admin_token != ADMIN_PASSWORD:
@@ -140,6 +151,22 @@ async def admin_login(body: AdminLogin):
     if body.password != ADMIN_PASSWORD:
         raise HTTPException(status_code=401, detail="Invalid password")
     return {"token": ADMIN_PASSWORD}
+
+
+@api_router.get("/settings", response_model=SiteSettings)
+async def get_settings():
+    doc = await db.settings.find_one({"_id": "site"}, {"_id": 0})
+    if not doc:
+        return SiteSettings()
+    merged = {**DEFAULT_SETTINGS, **doc}
+    return SiteSettings(**merged)
+
+
+@api_router.put("/settings", response_model=SiteSettings, dependencies=[Depends(require_admin)])
+async def update_settings(body: SiteSettings):
+    data = body.model_dump()
+    await db.settings.update_one({"_id": "site"}, {"$set": data}, upsert=True)
+    return body
 
 
 @api_router.post("/categories", response_model=Category, dependencies=[Depends(require_admin)])

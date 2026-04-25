@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../lib/apiClient";
-import { Plus, Trash2, ArrowLeft, LogOut, Save } from "lucide-react";
+import { Plus, Trash2, ArrowLeft, LogOut, Save, Settings as SettingsIcon } from "lucide-react";
 
 const PALETTE = ["#FFB300", "#4CAF50", "#FF3B30", "#3DA9FC", "#B388FF", "#FFFFFF", "#00BCD4", "#FF9800"];
 
@@ -335,11 +335,21 @@ export default function Admin() {
   const [activeId, setActiveId] = useState(null);
   const [items, setItems] = useState([]);
   const [chartRows, setChartRows] = useState([]);
+  const [settings, setSettings] = useState(null);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [settingsMsg, setSettingsMsg] = useState("");
 
   const loadCategories = async () => {
     const r = await api.get("/categories");
     setCategories(r.data);
     if (!activeId && r.data.length > 0) setActiveId(r.data[0].id);
+  };
+
+  const loadSettings = async () => {
+    try {
+      const r = await api.get("/settings");
+      setSettings(r.data);
+    } catch (e) { console.error(e); }
   };
 
   const loadItemsAndChart = async (cid) => {
@@ -349,7 +359,7 @@ export default function Admin() {
     setChartRows(r.data.rows);
   };
 
-  useEffect(() => { if (authed) loadCategories(); }, [authed]);
+  useEffect(() => { if (authed) { loadCategories(); loadSettings(); } }, [authed]);
   useEffect(() => { if (authed && activeId) loadItemsAndChart(activeId); }, [authed, activeId]);
 
   if (!authed) return <Login onSuccess={() => setAuthed(true)} />;
@@ -359,6 +369,20 @@ export default function Admin() {
   const refreshAll = async () => {
     await loadCategories();
     if (activeId) await loadItemsAndChart(activeId);
+  };
+
+  const saveSettings = async () => {
+    if (!settings) return;
+    setSavingSettings(true);
+    setSettingsMsg("");
+    try {
+      const r = await api.put("/settings", settings);
+      setSettings(r.data);
+      setSettingsMsg("Saved. Public site updated.");
+      setTimeout(() => setSettingsMsg(""), 3000);
+    } catch (e) {
+      alert("Failed: " + (e.response?.data?.detail || e.message));
+    } finally { setSavingSettings(false); }
   };
 
   return (
@@ -387,13 +411,85 @@ export default function Admin() {
       </header>
 
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
-        <div className="lg:col-span-4">
+        <div className="lg:col-span-4 space-y-4 sm:space-y-6">
           <CategoryManager
             categories={categories}
             refresh={loadCategories}
             activeId={activeId}
             setActiveId={(id) => setActiveId(id)}
           />
+          {/* Site Settings */}
+          <div className="tac-card p-4 sm:p-5" data-testid="site-settings">
+            <div className="flex items-center gap-2 mb-3">
+              <SettingsIcon size={14} color="#FFB300" />
+              <div className="data-label">Site Settings (Footer)</div>
+            </div>
+            {!settings ? (
+              <div className="text-muted-tac text-sm">Loading…</div>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <label className="data-label block mb-1">Footer Title (small label)</label>
+                  <input
+                    className="tac-input"
+                    value={settings.footer_title || ""}
+                    onChange={(e) => setSettings({ ...settings, footer_title: e.target.value })}
+                    data-testid="settings-footer-title"
+                  />
+                </div>
+                <div>
+                  <label className="data-label block mb-1">Text Before Link</label>
+                  <input
+                    className="tac-input"
+                    value={settings.footer_text_before || ""}
+                    onChange={(e) => setSettings({ ...settings, footer_text_before: e.target.value })}
+                    data-testid="settings-footer-before"
+                  />
+                </div>
+                <div>
+                  <label className="data-label block mb-1">Link Label</label>
+                  <input
+                    className="tac-input"
+                    value={settings.footer_link_label || ""}
+                    onChange={(e) => setSettings({ ...settings, footer_link_label: e.target.value })}
+                    data-testid="settings-footer-link-label"
+                  />
+                </div>
+                <div>
+                  <label className="data-label block mb-1">Link URL</label>
+                  <input
+                    className="tac-input"
+                    value={settings.footer_link_url || ""}
+                    onChange={(e) => setSettings({ ...settings, footer_link_url: e.target.value })}
+                    data-testid="settings-footer-link-url"
+                  />
+                </div>
+                <div>
+                  <label className="data-label block mb-1">Text After Link</label>
+                  <input
+                    className="tac-input"
+                    value={settings.footer_text_after || ""}
+                    onChange={(e) => setSettings({ ...settings, footer_text_after: e.target.value })}
+                    data-testid="settings-footer-after"
+                  />
+                </div>
+                <div className="text-xs font-mono text-muted-tac border-t pt-3" style={{ borderColor: "#272A30" }}>
+                  Preview: <span className="text-white">{settings.footer_text_before}<span className="text-primary-amber">{settings.footer_link_label}</span>{settings.footer_text_after}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    className="tac-btn-primary"
+                    onClick={saveSettings}
+                    disabled={savingSettings}
+                    data-testid="save-settings-btn"
+                  >
+                    <Save size={14} className="inline mr-1" /> {savingSettings ? "Saving..." : "Save Footer"}
+                  </button>
+                  {settingsMsg && <span className="text-[#4CAF50] font-mono text-xs" data-testid="settings-msg">{settingsMsg}</span>}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
         <div className="lg:col-span-8 space-y-4 sm:space-y-6">
           <ItemManager

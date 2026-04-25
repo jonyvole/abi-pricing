@@ -10,13 +10,24 @@ export default function Dashboard() {
   const [activeId, setActiveId] = useState(null);
   const [chartData, setChartData] = useState({ items: [], rows: [] });
   const [loading, setLoading] = useState(true);
+  const [settings, setSettings] = useState({
+    footer_title: "ABI Pricing Through Time",
+    footer_text_before: "Track in-game prices. Stay informed. Use creator code ",
+    footer_link_label: "JonyVole",
+    footer_link_url: "https://www.arenabreakoutinfinite.com/creatorcode/index.html?codeid=JonyVole",
+    footer_text_after: ".",
+  });
 
   useEffect(() => {
     (async () => {
       try {
-        const res = await api.get("/categories");
-        setCategories(res.data);
-        if (res.data.length > 0) setActiveId(res.data[0].id);
+        const [catRes, setRes] = await Promise.all([
+          api.get("/categories"),
+          api.get("/settings").catch(() => null),
+        ]);
+        setCategories(catRes.data);
+        if (catRes.data.length > 0) setActiveId(catRes.data[0].id);
+        if (setRes && setRes.data) setSettings((s) => ({ ...s, ...setRes.data }));
       } catch (e) {
         console.error(e);
       } finally {
@@ -171,19 +182,23 @@ export default function Dashboard() {
           </main>
         </div>
 
-        <footer className="mt-12 pt-6 border-t text-center" style={{ borderColor: "#272A30" }}>
-          <div className="data-label">ABI Pricing Through Time</div>
+        <footer className="mt-12 pt-6 border-t text-center" style={{ borderColor: "#272A30" }} data-testid="site-footer">
+          <div className="data-label">{settings.footer_title}</div>
           <div className="text-muted-tac text-xs mt-2 font-mono">
-            Track in-game prices. Stay informed. Use creator code{" "}
-            <a
-              href="https://www.arenabreakoutinfinite.com/creatorcode/index.html?codeid=JonyVole"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="tac-link"
-            >
-              JonyVole
-            </a>
-            .
+            {settings.footer_text_before}
+            {settings.footer_link_url ? (
+              <a
+                href={settings.footer_link_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="tac-link"
+              >
+                {settings.footer_link_label}
+              </a>
+            ) : (
+              <span>{settings.footer_link_label}</span>
+            )}
+            {settings.footer_text_after}
           </div>
         </footer>
       </div>
