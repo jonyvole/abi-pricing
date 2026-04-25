@@ -1,0 +1,21 @@
+# Render Blueprint — deploys the FastAPI backend in one click.
+# After connecting your GitHub repo to Render, choose "New > Blueprint" and pick this file.
+# You will be prompted to set MONGO_URL, DB_NAME, ADMIN_PASSWORD and CORS_ORIGINS.
+services:
+  - type: web
+    name: abi-pricing-backend
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    plan: free
+    autoDeploy: true
+    healthCheckPath: /api/
+    envVars:
+      - key: MONGO_URL
+        sync: false   # set in dashboard (e.g. mongodb+srv://... from MongoDB Atlas)
+      - key: DB_NAME
+        value: abi_pricing
+      - key: ADMIN_PASSWORD
+        sync: false   # set in dashboard
+      - key: CORS_ORIGINS
+        sync: false   # comma-separated list, e.g. https://your-site.edgeone.app,https://yourdomain.com
