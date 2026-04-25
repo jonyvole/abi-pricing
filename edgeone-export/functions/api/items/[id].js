@@ -1,0 +1,22 @@
+import { json, corsPreflight, readList, writeList, requireAdmin, KV_KEYS } from "../_shared.js";
+
+export async function onRequestOptions() { return corsPreflight(); }
+
+export async function onRequestDelete({ request, env, params }) {
+  const unauth = requireAdmin(request, env);
+  if (unauth) return unauth;
+  const id = params.id;
+  const [items, prices] = await Promise.all([
+    readList(env, KV_KEYS.ITEMS),
+    readList(env, KV_KEYS.PRICES),
+  ]);
+  const item = items.find((it) => it.id === id);
+  if (!item) return json({ detail: "Not found" }, 404);
+  const newItems = items.filter((it) => it.id !== id);
+  const newPrices = prices.filter((p) => p.item_id !== id);
+  await Promise.all([
+    writeList(env, KV_KEYS.ITEMS, newItems),
+    writeList(env, KV_KEYS.PRICES, newPrices),
+  ]);
+  return json({ ok: true });
+}
