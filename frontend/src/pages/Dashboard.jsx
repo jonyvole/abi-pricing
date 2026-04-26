@@ -166,7 +166,7 @@ export default function Dashboard() {
                         </div>
                         <div className="col-span-3 sm:col-span-2 font-mono text-right text-xs">
                           {pct != null ? (
-                            <span style={{ color: pct >= 0 ? "#4CAF50" : "#FF3B30" }}>
+                            <span style={{ color: pct <= 0 ? "#4CAF50" : "#FF3B30" }}>
                               {pct >= 0 ? "▲" : "▼"} {Math.abs(pct).toFixed(1)}%
                             </span>
                           ) : (
