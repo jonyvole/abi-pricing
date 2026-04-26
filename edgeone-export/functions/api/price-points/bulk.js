@@ -1,4 +1,4 @@
-import { json, corsPreflight, readList, writeList, requireAdmin, uuid, nowIso, KV_KEYS, safe } from "../_shared.js";
+import { json, corsPreflight, readList, writeList, requireAdmin, uuid, nowIso, STORE_KEYS, safe } from "../_shared.js";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -15,8 +15,8 @@ export const onRequestPost = safe(async ({ request, env }) => {
   if (!priceMap || typeof priceMap !== "object") return json({ detail: "prices object required" }, 400);
 
   const [items, prices] = await Promise.all([
-    readList(env, KV_KEYS.ITEMS),
-    readList(env, KV_KEYS.PRICES),
+    readList(env, STORE_KEYS.ITEMS),
+    readList(env, STORE_KEYS.PRICES),
   ]);
   const itemMap = new Map(items.map((it) => [it.id, it]));
   const created = [];
@@ -35,6 +35,6 @@ export const onRequestPost = safe(async ({ request, env }) => {
       created.push(entry);
     }
   }
-  await writeList(env, KV_KEYS.PRICES, prices);
+  await writeList(env, STORE_KEYS.PRICES, prices);
   return json({ created: created.length, items: created });
 });

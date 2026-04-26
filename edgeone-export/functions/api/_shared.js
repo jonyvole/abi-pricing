@@ -1,5 +1,9 @@
-// Shared helpers for EdgeOne Pages Edge Functions
-// This file is NOT routed (filename starts with underscore).
+// Shared helpers for EdgeOne Pages Edge Functions.
+// Storage backend: Upstash Redis (REST API).
+// Required env vars on the EdgeOne project:
+//   UPSTASH_REDIS_URL   -> https://<region>-<name>-<id>.upstash.io
+//   UPSTASH_REDIS_TOKEN -> the REST token from your Upstash console
+//   ADMIN_PASSWORD      -> the password for /admin
 
 export const DEFAULT_CATEGORIES = [
   "Helmets", "Masks", "Body Armour", "Unarmoured Chest Rigs",
@@ -25,11 +29,12 @@ export const SAMPLE_DATES = [
   "2025-09-01", "2025-10-01", "2025-11-01", "2025-12-01", "2026-01-01",
 ];
 
-export const KV_KEYS = {
-  CATEGORIES: "categories",
-  ITEMS: "items",
-  PRICES: "prices",
-  SEEDED: "seeded",
+export const STORE_KEYS = {
+  CATEGORIES: "abi:categories",
+  ITEMS: "abi:items",
+  PRICES: "abi:prices",
+  SETTINGS: "abi:settings",
+  SEEDED: "abi:seeded",
 };
 
 const JSON_HEADERS = {
@@ -46,7 +51,10 @@ export function json(data, status = 200, extra = {}) {
   });
 }
 
-// Wrap a handler so any thrown exception is returned as JSON instead of 545.
+export function corsPreflight() {
+  return new Response(null, { status: 204, headers: JSON_HEADERS });
+}
+
 export function safe(handler) {
   return async (ctx) => {
     try {
@@ -56,15 +64,12 @@ export function safe(handler) {
       return json({
         detail: "Edge function exception",
         error: msg.slice(0, 2000),
-        kv_bound: !!(ctx && ctx.env && ctx.env.PRICING_KV),
+        upstash_url_set: !!(ctx && ctx.env && ctx.env.UPSTASH_REDIS_URL),
+        upstash_token_set: !!(ctx && ctx.env && ctx.env.UPSTASH_REDIS_TOKEN),
         admin_set: !!(ctx && ctx.env && ctx.env.ADMIN_PASSWORD),
       }, 500);
     }
   };
-}
-
-export function corsPreflight() {
-  return new Response(null, { status: 204, headers: JSON_HEADERS });
 }
 
 export function uuid() {
@@ -84,30 +89,74 @@ export function nowIso() {
   return new Date().toISOString();
 }
 
-// ---- KV helpers (KV namespace bound as env.PRICING_KV) ----
-function getKV(env) {
-  if (!env || !env.PRICING_KV) {
-    throw new Error("KV namespace 'PRICING_KV' not bound. Bind it in EdgeOne Pages → Function Management → Namespace bindings.");
+// ---- Upstash Redis REST helpers ----
+async function redisCmd(env, cmd) {
+  const url = env && env.UPSTASH_REDIS_URL;
+  const token = env && env.UPSTASH_REDIS_TOKEN;
+  if (!url || !token) {
+    throw new Error("UPSTASH_REDIS_URL and UPSTASH_REDIS_TOKEN env vars not set");
   }
-  return env.PRICING_KV;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(cmd),
+  });
+  const txt = await res.text();
+  if (!res.ok) {
+    throw new Error(`Upstash ${res.status}: ${txt.slice(0, 300)}`);
+  }
+  let body;
+  try { body = JSON.parse(txt); } catch { throw new Error(`Upstash bad JSON: ${txt.slice(0, 200)}`); }
+  if (body && body.error) throw new Error(`Upstash error: ${body.error}`);
+  return body ? body.result : null;
 }
 
+async function redisGet(env, key) {
+  return await redisCmd(env, ["GET", key]);
+}
+
+async function redisSet(env, key, value) {
+  return await redisCmd(env, ["SET", key, value]);
+}
+
+// ---- High-level helpers used by all routes ----
 export async function readList(env, key) {
-  const kv = getKV(env);
-  const raw = await kv.get(key, { type: "json" });
-  return Array.isArray(raw) ? raw : [];
+  const raw = await redisGet(env, key);
+  if (!raw) return [];
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 export async function writeList(env, key, list) {
-  const kv = getKV(env);
-  await kv.put(key, JSON.stringify(list));
+  await redisSet(env, key, JSON.stringify(list));
+}
+
+export async function readJson(env, key) {
+  const raw = await redisGet(env, key);
+  if (!raw) return null;
+  try {
+    return typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch {
+    return null;
+  }
+}
+
+export async function writeJson(env, key, value) {
+  await redisSet(env, key, JSON.stringify(value));
 }
 
 export async function readAll(env) {
   const [categories, items, prices] = await Promise.all([
-    readList(env, KV_KEYS.CATEGORIES),
-    readList(env, KV_KEYS.ITEMS),
-    readList(env, KV_KEYS.PRICES),
+    readList(env, STORE_KEYS.CATEGORIES),
+    readList(env, STORE_KEYS.ITEMS),
+    readList(env, STORE_KEYS.PRICES),
   ]);
   return { categories, items, prices };
 }
@@ -127,12 +176,11 @@ export function requireAdmin(request, env) {
 
 // ---- Seed ----
 export async function ensureSeeded(env) {
-  const kv = getKV(env);
-  const seeded = await kv.get(KV_KEYS.SEEDED, { type: "text" });
+  const seeded = await redisGet(env, STORE_KEYS.SEEDED);
   if (seeded === "1") return false;
-  const existing = await readList(env, KV_KEYS.CATEGORIES);
+  const existing = await readList(env, STORE_KEYS.CATEGORIES);
   if (existing.length > 0) {
-    await kv.put(KV_KEYS.SEEDED, "1");
+    await redisSet(env, STORE_KEYS.SEEDED, "1");
     return false;
   }
   const categories = [];
@@ -158,10 +206,10 @@ export async function ensureSeeded(env) {
     });
   });
   await Promise.all([
-    writeList(env, KV_KEYS.CATEGORIES, categories),
-    writeList(env, KV_KEYS.ITEMS, items),
-    writeList(env, KV_KEYS.PRICES, prices),
+    writeList(env, STORE_KEYS.CATEGORIES, categories),
+    writeList(env, STORE_KEYS.ITEMS, items),
+    writeList(env, STORE_KEYS.PRICES, prices),
   ]);
-  await kv.put(KV_KEYS.SEEDED, "1");
+  await redisSet(env, STORE_KEYS.SEEDED, "1");
   return true;
 }

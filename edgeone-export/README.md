@@ -1,20 +1,20 @@
-# ABI Pricing — EdgeOne Pages Bundle
+# ABI Pricing — EdgeOne Pages Bundle (Upstash Redis edition)
 
-This is a fully self-contained build of your ABI Pricing dashboard ready to deploy on **Tencent EdgeOne Pages**. It contains:
+This is a fully self-contained build of your ABI Pricing dashboard ready to deploy on **Tencent EdgeOne Pages**, with persistent storage on **Upstash Redis** (free tier, no credit card needed).
 
-- **Static frontend** (the React build output) — the `index.html`, `static/`, and `assets/` folders.
-- **Edge Functions backend** (`functions/api/...`) — JavaScript replacements for the FastAPI server, written for the EdgeOne Pages V8 runtime.
-- **EdgeOne KV** (replaces MongoDB) — all categories, items, and price snapshots are stored in a KV namespace named `PRICING_KV`.
+- **Static frontend** (the React build output) — `index.html`, `static/`, `assets/`.
+- **Edge Functions backend** (`functions/api/...`) — JavaScript handlers for the EdgeOne V8 runtime.
+- **Upstash Redis** as the database (replaces both MongoDB and EdgeOne KV).
 
 The JonyVole creator-code banner is preserved at `assets/jonyvole-banner.png` and clicks through to your creator code page.
 
 ---
 
-## 1. What's in this folder
+## 1. Folder structure
 
 ```
 edgeone-export/
-├── index.html                      <- React entrypoint
+├── index.html                       <- React entrypoint
 ├── static/                          <- React JS / CSS
 ├── assets/jonyvole-banner.png       <- preserved Squarespace banner
 ├── asset-manifest.json
@@ -22,7 +22,9 @@ edgeone-export/
     └── api/
         ├── _shared.js               (helpers — not routed)
         ├── index.js                 GET  /api
+        ├── debug.js                 GET  /api/debug         (diagnostic)
         ├── seed.js                  GET  /api/seed
+        ├── settings.js              GET, PUT /api/settings  (footer text)
         ├── admin/
         │   └── login.js             POST /api/admin/login
         ├── categories/
@@ -35,61 +37,84 @@ edgeone-export/
         │   ├── index.js             GET, POST  /api/price-points
         │   ├── bulk.js              POST       /api/price-points/bulk
         │   └── [id].js              DELETE     /api/price-points/:id
-        ├── chart-data/
-        │   └── [id].js              GET        /api/chart-data/:id
-        └── settings.js              GET, PUT   /api/settings (footer text)
+        └── chart-data/
+            └── [id].js              GET        /api/chart-data/:id
 ```
 
 ---
 
-## 2. Deploy step-by-step (zip upload)
+## 2. Create your free Upstash Redis database (5 minutes)
 
-1. Log in to the **EdgeOne Console** → **Pages** → **Create Project** → choose **Direct Upload**.
-2. Compress the entire contents of this folder (NOT the parent folder) into a `.zip` and upload it. The structure inside the zip should start with `index.html`, `static/`, `assets/`, and `functions/`.
-3. Wait for EdgeOne to finish deploying. Click your preview URL — the dashboard should load and show the seeded sample data the first time anyone hits `/api/categories`.
+1. Go to **https://console.upstash.com/redis** and sign up (Google/GitHub login, no card required).
+2. Click **Create Database**.
+   - Name: `abi-pricing` (anything you like)
+   - Type: **Regional** (cheapest, plenty fast)
+   - Region: pick whatever is closest to you
+   - Eviction: **disabled** (you don't want price history evicted)
+3. After creation, scroll to the **REST API** section. You'll see two values you need:
+   - `UPSTASH_REDIS_REST_URL`  (e.g. `https://flying-tiger-12345.upstash.io`)
+   - `UPSTASH_REDIS_REST_TOKEN`  (a long string starting with `AY…`)
 
-> Alternative: push these files to GitHub and use **Import Git** in EdgeOne Pages — same result, with auto-redeploy on every push.
-
----
-
-## 3. Bind the KV namespace (required — admin will not work without this)
-
-The functions persist data in EdgeOne KV under a binding named `PRICING_KV`.
-
-1. **Console → KV Storage → Create Namespace** → name it anything (e.g. `abi-pricing`).
-2. Open your Pages project → **Function Management → Namespace bindings → Add binding**.
-3. **Variable name:** `PRICING_KV`  ←  *must be exactly this*
-4. **KV namespace:** select the one you just created.
-5. Save. (EdgeOne re-deploys functions automatically.)
+Keep that page open — you'll paste these into EdgeOne in step 4.
 
 ---
 
-## 4. Set the admin password
+## 3. Deploy the bundle to EdgeOne
 
-Set an environment variable on the project so the admin panel works:
+1. EdgeOne Console → **Pages** → **Create Project** → **Direct Upload**.
+2. Zip the contents of this folder (NOT the parent folder) and upload. The structure inside the zip should start with `index.html`, `static/`, `assets/`, and `functions/`.
+3. Wait for EdgeOne to finish deploying.
 
-1. Pages project → **Settings → Environment Variables → Add**.
-2. **Key:** `ADMIN_PASSWORD`
-3. **Value:** anything you like, e.g. `jonyvole2026` (this is the password you'll type at `/admin`).
-4. Save and redeploy.
+> Alternative: push these files to GitHub and use **Import Git** in EdgeOne Pages.
 
 ---
 
-## 5. First-run seed
+## 4. Set environment variables on the EdgeOne project
 
-The very first request to `/api/categories` (loading the dashboard) auto-seeds 10 default categories with sample data on Helmets and Tier 5 Ammo. You can also force it manually by visiting:
+Pages project → **Settings → Environment Variables → Add**. Add **three** variables:
 
+| Variable name | Value |
+|---|---|
+| `UPSTASH_REDIS_URL` | the REST URL from Upstash, e.g. `https://flying-tiger-12345.upstash.io` |
+| `UPSTASH_REDIS_TOKEN` | the long token from Upstash (starts with `AY…`) |
+| `ADMIN_PASSWORD` | whatever password you want to use to log in at `/admin` |
+
+Save and **redeploy** (EdgeOne usually does this automatically).
+
+> No KV namespace bindings needed. You can ignore the KV section entirely.
+
+---
+
+## 5. Verify everything is connected
+
+Open `https://<your-project>.edgeone.app/api/debug` in a browser. You should see:
+
+```json
+{
+  "upstash_url_set": true,
+  "upstash_token_set": true,
+  "admin_password_set": true,
+  "runtime_has_crypto": true,
+  "can_read": true,
+  "can_write": true,
+  "seeded_flag": null,    // becomes "1" after first dashboard load
+  "error": null
+}
 ```
-https://<your-project>.edgeone.app/api/seed
-```
 
-After that, log in at `/admin` with your `ADMIN_PASSWORD`, delete the sample data and add your real prices.
-
-The footer text ("Track in-game prices. Stay informed. Use creator code JonyVole.") is now editable from the **Site Settings (Footer)** card in the admin panel — no code change or rebuild needed. Five fields: title label, text-before-link, link label, link URL, text-after-link. Save → the public site updates instantly (KV is eventually consistent, may take ~60s).
+If any of `can_read` / `can_write` is `false`, the `error` field will tell you exactly what went wrong (most often a typo in the URL/token).
 
 ---
 
-## 6. Smoke-test the API
+## 6. Use the app
+
+1. Visit your EdgeOne URL — the dashboard loads, auto-seeds 10 categories on first request.
+2. Visit `/admin`, log in with your `ADMIN_PASSWORD`, delete the sample data, add real prices.
+3. Edit the footer text from the **Site Settings (Footer)** card in the admin panel — saves to Upstash Redis instantly, public site updates within a refresh.
+
+---
+
+## 7. Smoke-test the API by hand
 
 ```
 # 1. List categories (also triggers seed on first call)
@@ -109,25 +134,24 @@ curl -X POST https://<your-project>.edgeone.app/api/categories \
 
 ---
 
-## 7. Notes & limitations
+## 8. Free-tier limits (Upstash)
 
-- **KV is eventually consistent** (~60s global sync). After you save a price, refresh once if it takes a moment to appear.
-- **KV value size**: 25 MB per key — easily holds tens of thousands of price points for this app.
-- **Wrong password** on `/admin/login` returns HTTP 401; protected endpoints return 401 if `X-Admin-Token` header is missing or wrong.
-- The frontend uses **same-origin** API calls (`/api/...`), so there is no `REACT_APP_BACKEND_URL` to configure.
-- To change the admin password later, just update the `ADMIN_PASSWORD` env var in EdgeOne and redeploy.
+- **10 000 commands/day** (a "command" = one GET or one SET). Each chart view is 3 reads, each price-snapshot save is 1 write. 10 K/day comfortably covers thousands of visitors.
+- **256 MB storage** — your data won't exceed ~5 MB even after 10 years of weekly logging.
+- No credit card required, no expiry. If you ever outgrow free, paid tier starts at ~$0.20 per 100 K commands.
 
 ---
 
-## 8. If something doesn't work
+## 9. Troubleshooting
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Dashboard loads but sidebar is empty | KV namespace not bound | Bind `PRICING_KV` in Function Management → Namespace bindings |
-| `/api/admin/login` returns "ADMIN_PASSWORD env var not set" | Env var missing | Add `ADMIN_PASSWORD` env var, redeploy |
-| `404` on `/api/...` paths | Functions not deployed (zip didn't include `functions/` folder) | Re-zip with `functions/` at the root and re-upload |
-| Saved prices don't show up | KV eventual consistency | Wait ~60s and refresh |
+| `/api/debug` returns `upstash_url_set: false` | env var missing | Add `UPSTASH_REDIS_URL` in EdgeOne Settings, redeploy |
+| `/api/debug` returns `can_read: false` with auth error | token typo | Re-paste `UPSTASH_REDIS_TOKEN` from Upstash console |
+| `/api/admin/login` returns "ADMIN_PASSWORD env var not set" | env var missing | Add `ADMIN_PASSWORD` in EdgeOne Settings, redeploy |
+| Anything returns "Edge function exception" | something threw at runtime | The response now includes the actual error message — share it with support / your developer |
+| Saved prices don't show up | browser cache | Hard refresh (Ctrl-Shift-R / Cmd-Shift-R) |
 
 ---
 
-That's it. Drop the zip into EdgeOne Pages, bind KV, set the password — done.
+That's it. **Upload zip → set 3 env vars → done.** No KV bindings, no MongoDB, no extra services.

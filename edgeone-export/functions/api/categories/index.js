@@ -1,10 +1,10 @@
-import { json, corsPreflight, readList, writeList, requireAdmin, uuid, slugify, nowIso, ensureSeeded, KV_KEYS, safe } from "../_shared.js";
+import { json, corsPreflight, readList, writeList, requireAdmin, uuid, slugify, nowIso, ensureSeeded, STORE_KEYS, safe } from "../_shared.js";
 
 export async function onRequestOptions() { return corsPreflight(); }
 
 export const onRequestGet = safe(async ({ env }) => {
   await ensureSeeded(env);
-  const list = await readList(env, KV_KEYS.CATEGORIES);
+  const list = await readList(env, STORE_KEYS.CATEGORIES);
   list.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   return json(list);
 });
@@ -17,9 +17,9 @@ export const onRequestPost = safe(async ({ request, env }) => {
   const name = ((body && body.name) || "").trim();
   if (!name) return json({ detail: "Name required" }, 400);
   const order = Number.isFinite(body && body.order) ? body.order : 0;
-  const list = await readList(env, KV_KEYS.CATEGORIES);
+  const list = await readList(env, STORE_KEYS.CATEGORIES);
   const cat = { id: uuid(), name, slug: slugify(name), order, created_at: nowIso() };
   list.push(cat);
-  await writeList(env, KV_KEYS.CATEGORIES, list);
+  await writeList(env, STORE_KEYS.CATEGORIES, list);
   return json(cat);
 });
