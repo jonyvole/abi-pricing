@@ -3,7 +3,10 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from "recharts";
 
-const PALETTE = ["#FFB300", "#4CAF50", "#FF3B30", "#3DA9FC", "#B388FF", "#FFFFFF", "#00BCD4", "#FF9800"];
+const PALETTE = [
+  "#FFB300", "#4CAF50", "#FF3B30", "#3DA9FC", "#B388FF", "#FFFFFF", "#00BCD4", "#FF9800",
+  "#F472B6", "#FACC15", "#A3E635", "#94A3B8", "#FB923C", "#2DD4BF", "#C084FC",
+];
 
 function CustomTooltip({ active, payload, label }) {
   if (!active || !payload || !payload.length) return null;

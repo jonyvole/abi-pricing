@@ -3,7 +3,10 @@ import { Link } from "react-router-dom";
 import api from "../lib/apiClient";
 import { Plus, Trash2, ArrowLeft, LogOut, Save, Settings as SettingsIcon } from "lucide-react";
 
-const PALETTE = ["#FFB300", "#4CAF50", "#FF3B30", "#3DA9FC", "#B388FF", "#FFFFFF", "#00BCD4", "#FF9800"];
+const PALETTE = [
+  "#FFB300", "#4CAF50", "#FF3B30", "#3DA9FC", "#B388FF", "#FFFFFF", "#00BCD4", "#FF9800",
+  "#F472B6", "#FACC15", "#A3E635", "#94A3B8", "#FB923C", "#2DD4BF", "#C084FC",
+];
 
 function Login({ onSuccess }) {
   const [pw, setPw] = useState("");
@@ -160,7 +163,7 @@ function ItemManager({ activeCategory, items, refresh }) {
           onKeyDown={(e) => e.key === "Enter" && add()}
           data-testid="new-item-input"
         />
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-wrap">
           {PALETTE.map((c) => (
             <button
               key={c}
