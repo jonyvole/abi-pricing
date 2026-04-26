@@ -73,6 +73,18 @@ class PricePointBulkCreate(BaseModel):
     prices: dict  # item_id -> price
 
 
+class SnapshotEdit(BaseModel):
+    category_id: str
+    old_date: str
+    new_date: str
+    prices: dict  # item_id -> price (empty/None = remove that item from this snapshot)
+
+
+class SnapshotDelete(BaseModel):
+    category_id: str
+    date: str
+
+
 class AdminLogin(BaseModel):
     password: str
 
@@ -266,6 +278,46 @@ async def delete_price_point(pid: str):
     if res.deleted_count == 0:
         raise HTTPException(404, "Not found")
     return {"ok": True}
+
+
+@api_router.post("/price-points/edit-snapshot", dependencies=[Depends(require_admin)])
+async def edit_snapshot(body: SnapshotEdit):
+    try:
+        datetime.strptime(body.old_date, "%Y-%m-%d")
+        datetime.strptime(body.new_date, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(400, "Invalid date format, use YYYY-MM-DD")
+    items = await db.items.find({"category_id": body.category_id}, {"_id": 0, "id": 1}).to_list(2000)
+    valid_item_ids = {it["id"] for it in items}
+    affected = 0
+    for item_id, raw in body.prices.items():
+        if item_id not in valid_item_ids:
+            continue
+        # Empty / None / "" -> remove from old_date snapshot
+        if raw is None or raw == "":
+            await db.price_points.delete_many({"item_id": item_id, "date": body.old_date})
+            affected += 1
+            continue
+        try:
+            price_f = float(raw)
+        except (TypeError, ValueError):
+            continue
+        # Always remove old date entry first (handles rename + same-date upsert)
+        await db.price_points.delete_many({"item_id": item_id, "date": body.old_date})
+        # If new_date != old_date and there's already a different entry at new_date, replace it
+        await db.price_points.delete_many({"item_id": item_id, "date": body.new_date})
+        pp = PricePoint(item_id=item_id, date=body.new_date, price=price_f)
+        await db.price_points.insert_one(pp.model_dump())
+        affected += 1
+    return {"affected": affected, "old_date": body.old_date, "new_date": body.new_date}
+
+
+@api_router.post("/price-points/delete-snapshot", dependencies=[Depends(require_admin)])
+async def delete_snapshot(body: SnapshotDelete):
+    items = await db.items.find({"category_id": body.category_id}, {"_id": 0, "id": 1}).to_list(2000)
+    item_ids = [it["id"] for it in items]
+    res = await db.price_points.delete_many({"item_id": {"$in": item_ids}, "date": body.date})
+    return {"deleted": res.deleted_count}
 
 
 # ----- Seed -----

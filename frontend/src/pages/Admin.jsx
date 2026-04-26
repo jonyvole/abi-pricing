@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../lib/apiClient";
-import { Plus, Trash2, ArrowLeft, LogOut, Save, Settings as SettingsIcon } from "lucide-react";
+import { Plus, Trash2, ArrowLeft, LogOut, Save, Settings as SettingsIcon, Pencil, X, Check } from "lucide-react";
 
 const PALETTE = [
   "#FFB300", "#4CAF50", "#FF3B30", "#3DA9FC", "#B388FF", "#FFFFFF", "#00BCD4", "#FF9800",
@@ -179,6 +179,45 @@ function ItemManager({ activeCategory, items, refresh }) {
               aria-label={`Color ${c}`}
             />
           ))}
+          {/* Custom color picker */}
+          <label
+            className="w-7 h-7 cursor-pointer relative overflow-hidden flex items-center justify-center text-[10px] font-bold"
+            style={{
+              background: !PALETTE.includes(color) ? color : "linear-gradient(135deg,#FF3B30 0%,#FFB300 25%,#4CAF50 50%,#3DA9FC 75%,#B388FF 100%)",
+              outline: !PALETTE.includes(color) ? "2px solid #FFB300" : "1px solid #272A30",
+              outlineOffset: !PALETTE.includes(color) ? "2px" : "0",
+              color: !PALETTE.includes(color) ? "transparent" : "#08090A",
+            }}
+            title="Pick a custom color"
+            data-testid="color-custom-picker"
+            aria-label="Custom color"
+          >
+            {PALETTE.includes(color) ? "+" : ""}
+            <input
+              type="color"
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+              className="absolute inset-0 opacity-0 cursor-pointer"
+              aria-hidden="true"
+            />
+          </label>
+          {/* Hex text input */}
+          <input
+            type="text"
+            value={color}
+            onChange={(e) => {
+              const v = e.target.value.trim();
+              if (/^#?[0-9a-fA-F]{0,6}$/.test(v)) {
+                setColor(v.startsWith("#") ? v : "#" + v);
+              }
+            }}
+            maxLength={7}
+            className="tac-input font-mono text-xs"
+            style={{ width: 84 }}
+            placeholder="#hex"
+            data-testid="color-hex-input"
+            aria-label="Custom hex color"
+          />
         </div>
         <button className="tac-btn-primary" onClick={add} disabled={busy} data-testid="add-item-btn">
           <Plus size={16} className="inline mr-1" /> Add
@@ -212,10 +251,14 @@ function PriceEditor({ activeCategory, items, chartRows, refresh }) {
   const [prices, setPrices] = useState({});
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const [editingDate, setEditingDate] = useState(null);
+  const [editForm, setEditForm] = useState({ newDate: "", prices: {} });
+  const [editBusy, setEditBusy] = useState(false);
 
   useEffect(() => {
     setPrices({});
     setMsg("");
+    setEditingDate(null);
   }, [activeCategory?.id]);
 
   const submit = async () => {
@@ -239,12 +282,54 @@ function PriceEditor({ activeCategory, items, chartRows, refresh }) {
     } finally { setBusy(false); }
   };
 
-  const delPoint = async (pid) => {
-    if (!window.confirm("Delete this price point?")) return;
+  const startEdit = (row) => {
+    const map = {};
+    items.forEach((it) => {
+      map[it.id] = row[it.id] != null ? String(row[it.id]) : "";
+    });
+    setEditForm({ newDate: row.date, prices: map });
+    setEditingDate(row.date);
+  };
+
+  const cancelEdit = () => {
+    setEditingDate(null);
+    setEditForm({ newDate: "", prices: {} });
+  };
+
+  const saveEdit = async (oldDate) => {
+    if (!activeCategory) return;
+    if (!editForm.newDate) { alert("Pick a date"); return; }
+    setEditBusy(true);
     try {
-      await api.delete(`/price-points/${pid}`);
+      const res = await api.post("/price-points/edit-snapshot", {
+        category_id: activeCategory.id,
+        old_date: oldDate,
+        new_date: editForm.newDate,
+        prices: editForm.prices,
+      });
+      setMsg(`Updated ${res.data.affected} entries for ${oldDate}${oldDate !== editForm.newDate ? ` → ${editForm.newDate}` : ""}.`);
+      cancelEdit();
       await refresh();
-    } catch (e) { alert("Failed: " + (e.response?.data?.detail || e.message)); }
+      setTimeout(() => setMsg(""), 3500);
+    } catch (e) {
+      alert("Failed: " + (e.response?.data?.detail || e.message));
+    } finally { setEditBusy(false); }
+  };
+
+  const deleteSnapshot = async (oldDate) => {
+    if (!window.confirm(`Delete the entire snapshot for ${oldDate}? This removes all prices recorded on this date.`)) return;
+    try {
+      const res = await api.post("/price-points/delete-snapshot", {
+        category_id: activeCategory.id,
+        date: oldDate,
+      });
+      setMsg(`Deleted ${res.data.deleted} price point(s) for ${oldDate}.`);
+      cancelEdit();
+      await refresh();
+      setTimeout(() => setMsg(""), 3500);
+    } catch (e) {
+      alert("Failed: " + (e.response?.data?.detail || e.message));
+    }
   };
 
   if (!activeCategory) return null;
@@ -299,7 +384,7 @@ function PriceEditor({ activeCategory, items, chartRows, refresh }) {
 
       {/* History table */}
       <div className="mt-6">
-        <div className="data-label mb-2">History (latest 30)</div>
+        <div className="data-label mb-2">History (latest 30) — click a row to edit</div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs font-mono">
             <thead>
@@ -308,24 +393,105 @@ function PriceEditor({ activeCategory, items, chartRows, refresh }) {
                 {items.map((it) => (
                   <th key={it.id} className="py-2 pr-3 text-right">{it.name}</th>
                 ))}
+                <th className="py-2 pl-2 text-right" style={{ width: 80 }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {chartRows.slice(-30).reverse().map((r) => (
-                <tr key={r.date} className="border-t" style={{ borderColor: "#272A30" }} data-testid={`history-row-${r.date}`}>
-                  <td className="py-2 pr-3 text-white">{r.date}</td>
-                  {items.map((it) => (
-                    <td key={it.id} className="py-2 pr-3 text-right">
-                      {r[it.id] != null ? Number(r[it.id]).toLocaleString() : <span className="text-muted-tac">—</span>}
+              {chartRows.slice(-30).reverse().map((r) => {
+                const isEditing = editingDate === r.date;
+                if (isEditing) {
+                  return (
+                    <tr key={r.date} className="border-t bg-surface-2" style={{ borderColor: "#FFB300" }} data-testid={`history-edit-row-${r.date}`}>
+                      <td className="py-2 pr-3">
+                        <input
+                          type="date"
+                          className="tac-input"
+                          style={{ width: 150 }}
+                          value={editForm.newDate}
+                          onChange={(e) => setEditForm({ ...editForm, newDate: e.target.value })}
+                          data-testid={`edit-date-${r.date}`}
+                        />
+                      </td>
+                      {items.map((it) => (
+                        <td key={it.id} className="py-2 pr-3">
+                          <input
+                            type="number"
+                            step="any"
+                            className="tac-input"
+                            style={{ width: 110, textAlign: "right" }}
+                            placeholder="—"
+                            value={editForm.prices[it.id] ?? ""}
+                            onChange={(e) => setEditForm({ ...editForm, prices: { ...editForm.prices, [it.id]: e.target.value } })}
+                            data-testid={`edit-price-${r.date}-${it.id}`}
+                          />
+                        </td>
+                      ))}
+                      <td className="py-2 pl-2">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            className="tac-btn-primary"
+                            style={{ padding: "0.35rem 0.55rem", fontSize: "0.7rem" }}
+                            onClick={() => saveEdit(r.date)}
+                            disabled={editBusy}
+                            data-testid={`save-edit-${r.date}`}
+                            title="Save changes"
+                          >
+                            <Check size={12} />
+                          </button>
+                          <button
+                            className="tac-btn-secondary"
+                            style={{ padding: "0.35rem 0.55rem", fontSize: "0.7rem" }}
+                            onClick={cancelEdit}
+                            disabled={editBusy}
+                            data-testid={`cancel-edit-${r.date}`}
+                            title="Cancel"
+                          >
+                            <X size={12} />
+                          </button>
+                          <button
+                            className="tac-btn-danger"
+                            onClick={() => deleteSnapshot(r.date)}
+                            disabled={editBusy}
+                            data-testid={`delete-snapshot-${r.date}`}
+                            title="Delete entire snapshot"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                }
+                return (
+                  <tr key={r.date} className="border-t hover:bg-surface-2 transition-colors" style={{ borderColor: "#272A30" }} data-testid={`history-row-${r.date}`}>
+                    <td className="py-2 pr-3 text-white">{r.date}</td>
+                    {items.map((it) => (
+                      <td key={it.id} className="py-2 pr-3 text-right">
+                        {r[it.id] != null ? Number(r[it.id]).toLocaleString() : <span className="text-muted-tac">—</span>}
+                      </td>
+                    ))}
+                    <td className="py-2 pl-2 text-right">
+                      <button
+                        className="tac-btn-secondary"
+                        style={{ padding: "0.35rem 0.55rem", fontSize: "0.7rem" }}
+                        onClick={() => startEdit(r)}
+                        data-testid={`edit-snapshot-${r.date}`}
+                        title="Edit this snapshot"
+                      >
+                        <Pencil size={12} />
+                      </button>
                     </td>
-                  ))}
-                </tr>
-              ))}
+                  </tr>
+                );
+              })}
               {chartRows.length === 0 && (
-                <tr><td colSpan={items.length + 1} className="py-4 text-center text-muted-tac">No history yet.</td></tr>
+                <tr><td colSpan={items.length + 2} className="py-4 text-center text-muted-tac">No history yet.</td></tr>
               )}
             </tbody>
           </table>
+        </div>
+        <div className="text-muted-tac text-xs mt-2 font-mono">
+          Tip: Click <Pencil size={10} className="inline mx-0.5" /> to fix a wrong date or price. Leave a price field empty to remove just that one entry. Use <Trash2 size={10} className="inline mx-0.5" /> to delete the whole snapshot.
         </div>
       </div>
     </div>
