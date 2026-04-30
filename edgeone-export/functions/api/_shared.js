@@ -34,6 +34,7 @@ export const STORE_KEYS = {
   ITEMS: "abi:items",
   PRICES: "abi:prices",
   SETTINGS: "abi:settings",
+  LAST_EDITED: "abi:last_edited",
   SEEDED: "abi:seeded",
 };
 
@@ -150,6 +151,11 @@ export async function readJson(env, key) {
 
 export async function writeJson(env, key, value) {
   await redisSet(env, key, JSON.stringify(value));
+}
+
+export async function touchLastEdited(env, iso = nowIso()) {
+  await writeJson(env, STORE_KEYS.LAST_EDITED, { timestamp: iso });
+  return iso;
 }
 
 export async function readAll(env) {

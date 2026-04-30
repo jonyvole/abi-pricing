@@ -1,4 +1,4 @@
-import { json, corsPreflight, requireAdmin, safe, readJson, writeJson, STORE_KEYS } from "./_shared.js";
+import { json, corsPreflight, requireAdmin, safe, readJson, writeJson, touchLastEdited, nowIso, STORE_KEYS } from "./_shared.js";
 
 const DEFAULT_SETTINGS = {
   footer_title: "ABI Pricing Through Time",
@@ -26,8 +26,10 @@ export const onRequestPut = safe(async ({ request, env }) => {
     footer_link_label: String(body.footer_link_label ?? DEFAULT_SETTINGS.footer_link_label),
     footer_link_url: String(body.footer_link_url ?? DEFAULT_SETTINGS.footer_link_url),
     footer_text_after: String(body.footer_text_after ?? DEFAULT_SETTINGS.footer_text_after),
+    updated_at: nowIso(),
   };
   await writeJson(env, STORE_KEYS.SETTINGS, merged);
+  await touchLastEdited(env);
   return json(merged);
 });
 
