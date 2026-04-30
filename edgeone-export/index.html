@@ -114,6 +114,12 @@
         title.style.fontWeight = "700";
         title.style.marginBottom = "8px";
 
+        const ownerContact = document.createElement("div");
+        ownerContact.textContent = "Owner contact: Discord johny_vole";
+        ownerContact.style.fontSize = "12px";
+        ownerContact.style.color = "#A0A0A0";
+        ownerContact.style.marginBottom = "8px";
+
         const name = document.createElement("input");
         name.placeholder = "Name (optional)";
         name.maxLength = 120;
@@ -200,6 +206,7 @@
         row.appendChild(status);
         row.appendChild(submit);
         panel.appendChild(title);
+        panel.appendChild(ownerContact);
         panel.appendChild(name);
         panel.appendChild(contact);
         panel.appendChild(text);
@@ -281,7 +288,20 @@
       list.style.gap = "8px";
 
       let cachedItems = [];
+      const COLLAPSE_STATE_KEY = "abi_admin_suggestions_collapsed";
       let collapsed = false;
+
+      function applyCollapsedState() {
+        const display = collapsed ? "none" : "";
+        tokenInput.style.display = display;
+        controls.style.display = display;
+        status.style.display = display;
+        list.style.display = collapsed ? "none" : "grid";
+        panel.style.width = collapsed ? "220px" : "min(520px, calc(100vw - 24px))";
+        panel.style.maxHeight = collapsed ? "unset" : "75vh";
+        panel.style.overflow = collapsed ? "hidden" : "auto";
+        collapseBtn.textContent = collapsed ? "Expand" : "Collapse";
+      }
 
       function currentToken() {
         return tokenInput.value.trim();
@@ -441,15 +461,10 @@
 
       collapseBtn.addEventListener("click", function () {
         collapsed = !collapsed;
-        const display = collapsed ? "none" : "";
-        tokenInput.style.display = display;
-        controls.style.display = display;
-        status.style.display = display;
-        list.style.display = collapsed ? "none" : "grid";
-        panel.style.width = collapsed ? "220px" : "min(520px, calc(100vw - 24px))";
-        panel.style.maxHeight = collapsed ? "unset" : "75vh";
-        panel.style.overflow = collapsed ? "hidden" : "auto";
-        collapseBtn.textContent = collapsed ? "Expand" : "Collapse";
+        try {
+          window.localStorage.setItem(COLLAPSE_STATE_KEY, collapsed ? "1" : "0");
+        } catch (e) {}
+        applyCollapsedState();
       });
 
       header.appendChild(title);
@@ -462,6 +477,13 @@
       panel.appendChild(status);
       panel.appendChild(list);
       document.body.appendChild(panel);
+
+      try {
+        collapsed = window.localStorage.getItem(COLLAPSE_STATE_KEY) === "1";
+      } catch (e) {
+        collapsed = false;
+      }
+      applyCollapsedState();
     })();
   </script>
 </body>
