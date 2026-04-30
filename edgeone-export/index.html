@@ -62,5 +62,376 @@
         });
     })();
   </script>
+  <script>
+    (function () {
+      const isAdminPage = window.location.pathname === "/admin";
+
+      function cardBase(el) {
+        el.style.background = "rgba(8, 9, 10, 0.88)";
+        el.style.border = "1px solid rgba(255, 255, 255, 0.12)";
+        el.style.borderRadius = "10px";
+        el.style.boxShadow = "0 6px 18px rgba(0,0,0,0.3)";
+        el.style.color = "#EDEDED";
+        el.style.fontFamily = "Arial, sans-serif";
+      }
+
+      function inputBase(el) {
+        el.style.width = "100%";
+        el.style.padding = "8px";
+        el.style.borderRadius = "6px";
+        el.style.border = "1px solid #3A3A3A";
+        el.style.background = "#0F1115";
+        el.style.color = "#F2F2F2";
+      }
+
+      if (!isAdminPage) {
+        const btn = document.createElement("button");
+        btn.textContent = "Suggestions";
+        btn.style.position = "fixed";
+        btn.style.right = "12px";
+        btn.style.bottom = "10px";
+        btn.style.zIndex = "10000";
+        btn.style.background = "#3DA9FC";
+        btn.style.border = "none";
+        btn.style.color = "#06131F";
+        btn.style.fontWeight = "700";
+        btn.style.borderRadius = "8px";
+        btn.style.padding = "8px 12px";
+        btn.style.cursor = "pointer";
+
+        const panel = document.createElement("div");
+        panel.style.position = "fixed";
+        panel.style.right = "12px";
+        panel.style.bottom = "52px";
+        panel.style.width = "min(360px, calc(100vw - 24px))";
+        panel.style.padding = "12px";
+        panel.style.display = "none";
+        panel.style.zIndex = "10000";
+        cardBase(panel);
+
+        const title = document.createElement("div");
+        title.textContent = "Send a suggestion";
+        title.style.fontWeight = "700";
+        title.style.marginBottom = "8px";
+
+        const name = document.createElement("input");
+        name.placeholder = "Name (optional)";
+        name.maxLength = 120;
+        inputBase(name);
+
+        const contact = document.createElement("input");
+        contact.placeholder = "Contact (optional, e.g. Discord or email)";
+        contact.maxLength = 200;
+        contact.style.marginTop = "6px";
+        inputBase(contact);
+
+        const text = document.createElement("textarea");
+        text.placeholder = "Write your idea here...";
+        text.maxLength = 1000;
+        text.style.width = "100%";
+        text.style.height = "90px";
+        text.style.borderRadius = "6px";
+        text.style.padding = "8px";
+        text.style.resize = "vertical";
+        text.style.border = "1px solid #3A3A3A";
+        text.style.background = "#0F1115";
+        text.style.color = "#F2F2F2";
+        text.style.marginTop = "6px";
+
+        const row = document.createElement("div");
+        row.style.display = "flex";
+        row.style.justifyContent = "space-between";
+        row.style.alignItems = "center";
+        row.style.marginTop = "8px";
+
+        const status = document.createElement("span");
+        status.style.fontSize = "12px";
+        status.style.color = "#A0A0A0";
+
+        const submit = document.createElement("button");
+        submit.textContent = "Submit";
+        submit.style.background = "#4CAF50";
+        submit.style.border = "none";
+        submit.style.padding = "6px 10px";
+        submit.style.borderRadius = "6px";
+        submit.style.cursor = "pointer";
+        submit.style.fontWeight = "700";
+
+        submit.addEventListener("click", function () {
+          const value = text.value.trim();
+          if (!value) {
+            status.textContent = "Please write a suggestion first.";
+            return;
+          }
+          submit.disabled = true;
+          status.textContent = "Sending...";
+          fetch("/api/suggestions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: value, name: name.value.trim(), contact: contact.value.trim() }),
+          })
+            .then(function (res) {
+              return res.json().catch(function () { return {}; }).then(function (data) {
+                if (!res.ok) {
+                  if (res.status === 429 && data && data.retry_after_seconds) {
+                    throw new Error("Please wait " + data.retry_after_seconds + "s before sending another suggestion.");
+                  }
+                  throw new Error((data && data.detail) || "Request failed");
+                }
+                return data;
+              });
+            })
+            .then(function () {
+              text.value = "";
+              status.textContent = "Thanks! Suggestion sent.";
+            })
+            .catch(function (err) {
+              status.textContent = err && err.message ? err.message : "Could not send suggestion.";
+            })
+            .finally(function () {
+              submit.disabled = false;
+            });
+        });
+
+        btn.addEventListener("click", function () {
+          panel.style.display = panel.style.display === "none" ? "block" : "none";
+        });
+
+        row.appendChild(status);
+        row.appendChild(submit);
+        panel.appendChild(title);
+        panel.appendChild(name);
+        panel.appendChild(contact);
+        panel.appendChild(text);
+        panel.appendChild(row);
+        document.body.appendChild(btn);
+        document.body.appendChild(panel);
+        return;
+      }
+
+      const panel = document.createElement("div");
+      panel.style.position = "fixed";
+      panel.style.right = "12px";
+      panel.style.top = "12px";
+      panel.style.width = "min(520px, calc(100vw - 24px))";
+      panel.style.maxHeight = "75vh";
+      panel.style.overflow = "auto";
+      panel.style.padding = "12px";
+      panel.style.zIndex = "10000";
+      cardBase(panel);
+
+      const title = document.createElement("div");
+      title.textContent = "Suggestions";
+      title.style.fontWeight = "700";
+      title.style.marginBottom = "8px";
+
+      const tokenInput = document.createElement("input");
+      tokenInput.type = "password";
+      tokenInput.placeholder = "Admin password/token";
+      inputBase(tokenInput);
+
+      const controls = document.createElement("div");
+      controls.style.display = "flex";
+      controls.style.gap = "8px";
+      controls.style.marginTop = "8px";
+      controls.style.alignItems = "center";
+
+      const loadBtn = document.createElement("button");
+      loadBtn.textContent = "Load suggestions";
+      loadBtn.style.background = "#3DA9FC";
+      loadBtn.style.border = "none";
+      loadBtn.style.padding = "6px 10px";
+      loadBtn.style.borderRadius = "6px";
+      loadBtn.style.cursor = "pointer";
+      loadBtn.style.fontWeight = "700";
+
+      const unreadOnlyLabel = document.createElement("label");
+      unreadOnlyLabel.style.fontSize = "12px";
+      unreadOnlyLabel.style.display = "flex";
+      unreadOnlyLabel.style.alignItems = "center";
+      unreadOnlyLabel.style.gap = "6px";
+      const unreadOnly = document.createElement("input");
+      unreadOnly.type = "checkbox";
+      unreadOnlyLabel.appendChild(unreadOnly);
+      unreadOnlyLabel.appendChild(document.createTextNode("Unread only"));
+
+      const status = document.createElement("div");
+      status.style.fontSize = "12px";
+      status.style.marginTop = "8px";
+      status.style.color = "#A0A0A0";
+
+      const list = document.createElement("div");
+      list.style.marginTop = "10px";
+      list.style.display = "grid";
+      list.style.gap = "8px";
+
+      let cachedItems = [];
+
+      function currentToken() {
+        return tokenInput.value.trim();
+      }
+
+      function updateItem(id, patchBody) {
+        return fetch("/api/suggestions/" + encodeURIComponent(id), {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Admin-Token": currentToken(),
+          },
+          body: JSON.stringify(patchBody),
+        }).then(function (res) {
+          if (!res.ok) throw new Error("Update failed");
+          return res.json();
+        });
+      }
+
+      function deleteItem(id) {
+        return fetch("/api/suggestions/" + encodeURIComponent(id), {
+          method: "DELETE",
+          headers: { "X-Admin-Token": currentToken() },
+        }).then(function (res) {
+          if (!res.ok) throw new Error("Delete failed");
+          return res.json();
+        });
+      }
+
+      function renderSuggestions() {
+        const items = unreadOnly.checked ? cachedItems.filter(function (i) { return i.status !== "read"; }) : cachedItems.slice();
+        list.innerHTML = "";
+        if (!items.length) {
+          const empty = document.createElement("div");
+          empty.textContent = "No suggestions found.";
+          empty.style.color = "#A0A0A0";
+          list.appendChild(empty);
+          return;
+        }
+
+        items.forEach(function (item) {
+          const card = document.createElement("div");
+          card.style.border = "1px solid rgba(255,255,255,0.1)";
+          card.style.borderRadius = "8px";
+          card.style.padding = "8px";
+          card.style.background = item.status === "read" ? "rgba(255,255,255,0.02)" : "rgba(61,169,252,0.08)";
+
+          const meta = document.createElement("div");
+          meta.style.fontSize = "11px";
+          meta.style.color = "#A0A0A0";
+          meta.style.marginBottom = "6px";
+          const who = item.name ? item.name : "Anonymous";
+          const contactText = item.contact ? " | " + item.contact : "";
+          const when = item.created_at ? new Date(item.created_at).toLocaleString() : "";
+          const readTag = item.status === "read" ? " | read" : " | new";
+          meta.textContent = who + contactText + " | " + when + readTag;
+
+          const text = document.createElement("div");
+          text.textContent = item.text || "";
+          text.style.whiteSpace = "pre-wrap";
+          text.style.wordBreak = "break-word";
+
+          const actions = document.createElement("div");
+          actions.style.display = "flex";
+          actions.style.gap = "8px";
+          actions.style.marginTop = "8px";
+
+          const readBtn = document.createElement("button");
+          readBtn.textContent = item.status === "read" ? "Mark unread" : "Mark read";
+          readBtn.style.padding = "4px 8px";
+          readBtn.style.border = "none";
+          readBtn.style.borderRadius = "6px";
+          readBtn.style.cursor = "pointer";
+          readBtn.style.background = "#4CAF50";
+          readBtn.style.fontWeight = "700";
+
+          const delBtn = document.createElement("button");
+          delBtn.textContent = "Delete";
+          delBtn.style.padding = "4px 8px";
+          delBtn.style.border = "none";
+          delBtn.style.borderRadius = "6px";
+          delBtn.style.cursor = "pointer";
+          delBtn.style.background = "#FF3B30";
+          delBtn.style.color = "#fff";
+          delBtn.style.fontWeight = "700";
+
+          readBtn.addEventListener("click", function () {
+            if (!currentToken()) {
+              status.textContent = "Enter admin token first.";
+              return;
+            }
+            updateItem(item.id, { read: item.status !== "read" })
+              .then(function (res) {
+                const idx = cachedItems.findIndex(function (it) { return it.id === item.id; });
+                if (idx >= 0) cachedItems[idx] = res.item || cachedItems[idx];
+                renderSuggestions();
+                status.textContent = "Suggestion updated.";
+              })
+              .catch(function () {
+                status.textContent = "Could not update suggestion.";
+              });
+          });
+
+          delBtn.addEventListener("click", function () {
+            if (!currentToken()) {
+              status.textContent = "Enter admin token first.";
+              return;
+            }
+            if (!window.confirm("Delete this suggestion?")) return;
+            deleteItem(item.id)
+              .then(function () {
+                cachedItems = cachedItems.filter(function (it) { return it.id !== item.id; });
+                renderSuggestions();
+                status.textContent = "Suggestion deleted.";
+              })
+              .catch(function () {
+                status.textContent = "Could not delete suggestion.";
+              });
+          });
+
+          actions.appendChild(readBtn);
+          actions.appendChild(delBtn);
+          card.appendChild(meta);
+          card.appendChild(text);
+          card.appendChild(actions);
+          list.appendChild(card);
+        });
+      }
+
+      function loadSuggestions() {
+        const token = currentToken();
+        if (!token) {
+          status.textContent = "Enter admin password/token first.";
+          return;
+        }
+        status.textContent = "Loading...";
+        fetch("/api/suggestions", {
+          headers: { "X-Admin-Token": token },
+        })
+          .then(function (res) {
+            if (res.status === 401) throw new Error("Unauthorized");
+            if (!res.ok) throw new Error("Request failed");
+            return res.json();
+          })
+          .then(function (data) {
+            cachedItems = Array.isArray(data) ? data : [];
+            renderSuggestions();
+            status.textContent = "Loaded.";
+          })
+          .catch(function (err) {
+            status.textContent = err && err.message === "Unauthorized" ? "Invalid admin token." : "Could not load suggestions.";
+          });
+      }
+
+      loadBtn.addEventListener("click", loadSuggestions);
+      unreadOnly.addEventListener("change", renderSuggestions);
+
+      controls.appendChild(loadBtn);
+      controls.appendChild(unreadOnlyLabel);
+      panel.appendChild(title);
+      panel.appendChild(tokenInput);
+      panel.appendChild(controls);
+      panel.appendChild(status);
+      panel.appendChild(list);
+      document.body.appendChild(panel);
+    })();
+  </script>
 </body>
 </html>
