@@ -14,5 +14,53 @@
 <body>
   <noscript>You need to enable JavaScript to run this app.</noscript>
   <div id="root"></div>
+  <script>
+    (function () {
+      function formatRelativeTime(iso) {
+        const date = new Date(iso);
+        if (Number.isNaN(date.getTime())) return "unknown";
+        const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+        if (seconds < 60) return "just now";
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return minutes + " minute" + (minutes === 1 ? "" : "s") + " ago";
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return hours + " hour" + (hours === 1 ? "" : "s") + " ago";
+        const days = Math.floor(hours / 24);
+        return days + " day" + (days === 1 ? "" : "s") + " ago";
+      }
+
+      function mountFooter(lastEditedAt) {
+        const el = document.createElement("div");
+        el.id = "last-edited-indicator";
+        el.style.position = "fixed";
+        el.style.left = "12px";
+        el.style.bottom = "10px";
+        el.style.zIndex = "9999";
+        el.style.fontSize = "12px";
+        el.style.color = "#A0A0A0";
+        el.style.background = "rgba(8, 9, 10, 0.7)";
+        el.style.padding = "4px 8px";
+        el.style.borderRadius = "6px";
+        el.style.backdropFilter = "blur(2px)";
+
+        function render() {
+          el.textContent = "Last edited: " + (lastEditedAt ? formatRelativeTime(lastEditedAt) : "not available");
+        }
+
+        render();
+        setInterval(render, 60000);
+        document.body.appendChild(el);
+      }
+
+      fetch("/api/last-edited")
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          mountFooter(data && data.last_edited_at ? data.last_edited_at : null);
+        })
+        .catch(function () {
+          mountFooter(null);
+        });
+    })();
+  </script>
 </body>
 </html>
