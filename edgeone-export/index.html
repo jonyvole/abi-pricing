@@ -220,10 +220,25 @@
       panel.style.zIndex = "10000";
       cardBase(panel);
 
+      const header = document.createElement("div");
+      header.style.display = "flex";
+      header.style.justifyContent = "space-between";
+      header.style.alignItems = "center";
+      header.style.marginBottom = "8px";
+
       const title = document.createElement("div");
       title.textContent = "Suggestions";
       title.style.fontWeight = "700";
-      title.style.marginBottom = "8px";
+
+      const collapseBtn = document.createElement("button");
+      collapseBtn.textContent = "Collapse";
+      collapseBtn.style.background = "rgba(255,255,255,0.1)";
+      collapseBtn.style.border = "1px solid rgba(255,255,255,0.2)";
+      collapseBtn.style.color = "#EDEDED";
+      collapseBtn.style.padding = "4px 8px";
+      collapseBtn.style.borderRadius = "6px";
+      collapseBtn.style.cursor = "pointer";
+      collapseBtn.style.fontSize = "12px";
 
       const tokenInput = document.createElement("input");
       tokenInput.type = "password";
@@ -266,6 +281,7 @@
       list.style.gap = "8px";
 
       let cachedItems = [];
+      let collapsed = false;
 
       function currentToken() {
         return tokenInput.value.trim();
@@ -423,9 +439,24 @@
       loadBtn.addEventListener("click", loadSuggestions);
       unreadOnly.addEventListener("change", renderSuggestions);
 
+      collapseBtn.addEventListener("click", function () {
+        collapsed = !collapsed;
+        const display = collapsed ? "none" : "";
+        tokenInput.style.display = display;
+        controls.style.display = display;
+        status.style.display = display;
+        list.style.display = collapsed ? "none" : "grid";
+        panel.style.width = collapsed ? "220px" : "min(520px, calc(100vw - 24px))";
+        panel.style.maxHeight = collapsed ? "unset" : "75vh";
+        panel.style.overflow = collapsed ? "hidden" : "auto";
+        collapseBtn.textContent = collapsed ? "Expand" : "Collapse";
+      });
+
+      header.appendChild(title);
+      header.appendChild(collapseBtn);
+      panel.appendChild(header);
       controls.appendChild(loadBtn);
       controls.appendChild(unreadOnlyLabel);
-      panel.appendChild(title);
       panel.appendChild(tokenInput);
       panel.appendChild(controls);
       panel.appendChild(status);
