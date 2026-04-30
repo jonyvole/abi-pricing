@@ -35,6 +35,8 @@ export const STORE_KEYS = {
   PRICES: "abi:prices",
   SETTINGS: "abi:settings",
   LAST_EDITED: "abi:last_edited",
+  SUGGESTIONS: "abi:suggestions",
+  SUGGESTION_RATE_LIMIT: "abi:suggestion_rate_limit",
   SEEDED: "abi:seeded",
 };
 
