@@ -1,4 +1,4 @@
-import { json, corsPreflight, readList, writeList, requireAdmin, uuid, slugify, nowIso, ensureSeeded, STORE_KEYS, safe } from "../_shared.js";
+import { json, corsPreflight, readList, writeList, requireAdmin, uuid, slugify, nowIso, ensureSeeded, STORE_KEYS, touchLastEdited, safe } from "../_shared.js";
 
 export async function onRequestOptions() { return corsPreflight(); }
 
@@ -21,5 +21,6 @@ export const onRequestPost = safe(async ({ request, env }) => {
   const cat = { id: uuid(), name, slug: slugify(name), order, created_at: nowIso() };
   list.push(cat);
   await writeList(env, STORE_KEYS.CATEGORIES, list);
+  await touchLastEdited(env);
   return json(cat);
 });
