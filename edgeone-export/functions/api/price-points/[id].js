@@ -1,4 +1,4 @@
-import { json, corsPreflight, readList, writeList, requireAdmin, STORE_KEYS, safe } from "../_shared.js";
+import { json, corsPreflight, readList, writeList, requireAdmin, STORE_KEYS, touchLastEdited, safe } from "../_shared.js";
 
 export async function onRequestOptions() { return corsPreflight(); }
 
@@ -11,5 +11,6 @@ export const onRequestDelete = safe(async ({ request, env, params }) => {
   const next = prices.filter((p) => p.id !== id);
   if (next.length === before) return json({ detail: "Not found" }, 404);
   await writeList(env, STORE_KEYS.PRICES, next);
+  await touchLastEdited(env);
   return json({ ok: true });
 });

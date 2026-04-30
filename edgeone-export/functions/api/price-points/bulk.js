@@ -1,4 +1,4 @@
-import { json, corsPreflight, readList, writeList, requireAdmin, uuid, nowIso, STORE_KEYS, safe } from "../_shared.js";
+import { json, corsPreflight, readList, writeList, requireAdmin, uuid, nowIso, STORE_KEYS, touchLastEdited, safe } from "../_shared.js";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -27,7 +27,7 @@ export const onRequestPost = safe(async ({ request, env }) => {
     if (!itemMap.has(itemId)) continue;
     const idx = prices.findIndex((p) => p.item_id === itemId && p.date === date);
     if (idx >= 0) {
-      prices[idx] = { ...prices[idx], price: num };
+      prices[idx] = { ...prices[idx], price: num, updated_at: nowIso() };
       created.push(prices[idx]);
     } else {
       const entry = { id: uuid(), item_id: itemId, date, price: num, created_at: nowIso() };
@@ -36,5 +36,6 @@ export const onRequestPost = safe(async ({ request, env }) => {
     }
   }
   await writeList(env, STORE_KEYS.PRICES, prices);
+  await touchLastEdited(env);
   return json({ created: created.length, items: created });
 });

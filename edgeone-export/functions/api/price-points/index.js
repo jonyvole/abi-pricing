@@ -1,4 +1,4 @@
-import { json, corsPreflight, readList, writeList, requireAdmin, uuid, nowIso, STORE_KEYS, safe } from "../_shared.js";
+import { json, corsPreflight, readList, writeList, requireAdmin, uuid, nowIso, STORE_KEYS, touchLastEdited, safe } from "../_shared.js";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -29,12 +29,13 @@ export const onRequestPost = safe(async ({ request, env }) => {
   const idx = prices.findIndex((p) => p.item_id === item_id && p.date === date);
   let entry;
   if (idx >= 0) {
-    prices[idx] = { ...prices[idx], price: priceNum };
+    prices[idx] = { ...prices[idx], price: priceNum, updated_at: nowIso() };
     entry = prices[idx];
   } else {
     entry = { id: uuid(), item_id, date, price: priceNum, created_at: nowIso() };
     prices.push(entry);
   }
   await writeList(env, STORE_KEYS.PRICES, prices);
+  await touchLastEdited(env);
   return json(entry);
 });

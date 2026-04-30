@@ -1,4 +1,4 @@
-import { json, corsPreflight, readList, writeList, requireAdmin, uuid, nowIso, STORE_KEYS, safe } from "../_shared.js";
+import { json, corsPreflight, readList, writeList, requireAdmin, uuid, nowIso, STORE_KEYS, touchLastEdited, safe } from "../_shared.js";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -40,5 +40,6 @@ export const onRequestPost = safe(async ({ request, env }) => {
     affected += 1;
   }
   await writeList(env, STORE_KEYS.PRICES, next);
+  await touchLastEdited(env);
   return json({ affected, old_date, new_date });
 });
