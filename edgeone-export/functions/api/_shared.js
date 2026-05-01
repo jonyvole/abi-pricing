@@ -92,6 +92,105 @@ export function nowIso() {
   return new Date().toISOString();
 }
 
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const SNAPSHOT_LABEL_RE = /^(\d{4}-\d{2}-\d{2})\s+(\d{1,2})(?::(00|30))?(am|pm)\s+(UTC[+-]\d{2}:\d{2})$/i;
+
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+
+function roundToHalfHour(date) {
+  const d = new Date(date);
+  d.setSeconds(0, 0);
+  const minutes = d.getMinutes();
+  if (minutes < 15) d.setMinutes(0);
+  else if (minutes < 45) d.setMinutes(30);
+  else {
+    d.setHours(d.getHours() + 1);
+    d.setMinutes(0);
+  }
+  return d;
+}
+
+function timezoneLabel(date) {
+  const offsetMinutes = -date.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? "+" : "-";
+  const abs = Math.abs(offsetMinutes);
+  const hh = pad2(Math.floor(abs / 60));
+  const mm = pad2(abs % 60);
+  return `UTC${sign}${hh}:${mm}`;
+}
+
+function timeLabel(date) {
+  const rawHours = date.getHours();
+  const minutes = date.getMinutes();
+  const ampm = rawHours >= 12 ? "pm" : "am";
+  const hour12 = rawHours % 12 || 12;
+  return minutes === 0 ? `${hour12}${ampm}` : `${hour12}:${pad2(minutes)}${ampm}`;
+}
+
+function parseDateOnlyLocal(dateOnly) {
+  const [year, month, day] = dateOnly.split("-").map(Number);
+  return new Date(year, month - 1, day, 0, 0, 0, 0);
+}
+
+export function formatSnapshotDateLabel(dateOnly, now = new Date()) {
+  const rounded = roundToHalfHour(now);
+  return `${dateOnly} ${timeLabel(rounded)} ${timezoneLabel(rounded)}`;
+}
+
+export function normalizeSnapshotDateInput(input, now = new Date()) {
+  const value = String(input || "").trim();
+  if (!value) return "";
+  if (DATE_ONLY_RE.test(value)) return formatSnapshotDateLabel(value, now);
+  return value;
+}
+
+export function compareSnapshotDates(a, b) {
+  const va = String(a || "").trim();
+  const vb = String(b || "").trim();
+  if (va === vb) return 0;
+
+  const ma = va.match(SNAPSHOT_LABEL_RE);
+  const mb = vb.match(SNAPSHOT_LABEL_RE);
+  if (ma && mb) {
+    const [_, dateA, hA, mA = "00", apA] = ma;
+    const [__, dateB, hB, mB = "00", apB] = mb;
+    const toMinuteOfDay = (h, m, ap) => {
+      let hh = Number(h) % 12;
+      if (String(ap).toLowerCase() === "pm") hh += 12;
+      return hh * 60 + Number(m);
+    };
+    const d = dateA.localeCompare(dateB);
+    if (d !== 0) return d;
+    return toMinuteOfDay(hA, mA, apA) - toMinuteOfDay(hB, mB, apB);
+  }
+
+  if (DATE_ONLY_RE.test(va) && DATE_ONLY_RE.test(vb)) {
+    return va.localeCompare(vb);
+  }
+
+  if (DATE_ONLY_RE.test(va) && mb) {
+    const dateCmp = va.localeCompare(mb[1]);
+    if (dateCmp !== 0) return dateCmp;
+    return -1;
+  }
+  if (ma && DATE_ONLY_RE.test(vb)) {
+    const dateCmp = ma[1].localeCompare(vb);
+    if (dateCmp !== 0) return dateCmp;
+    return 1;
+  }
+
+  const da = Date.parse(va);
+  const db = Date.parse(vb);
+  if (Number.isFinite(da) && Number.isFinite(db)) return da - db;
+
+  if (DATE_ONLY_RE.test(va)) return parseDateOnlyLocal(va).getTime() - (Number.isFinite(db) ? db : 0);
+  if (DATE_ONLY_RE.test(vb)) return (Number.isFinite(da) ? da : 0) - parseDateOnlyLocal(vb).getTime();
+
+  return va.localeCompare(vb);
+}
+
 // ---- Upstash Redis REST helpers ----
 async function redisCmd(env, cmd) {
   const url = env && env.UPSTASH_REDIS_URL;
