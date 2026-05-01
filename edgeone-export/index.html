@@ -608,10 +608,39 @@
         else if (input && input.method) method = String(input.method).toUpperCase();
 
         if (!shouldPatchRequest(reqUrl, method)) return originalFetch(input, init);
-        if (!init || typeof init.body !== "string") return originalFetch(input, init);
+        if (init && typeof init.body === "string") {
+          var nextInit = Object.assign({}, init, { body: patchBody(reqUrl, init.body) });
+          return originalFetch(input, nextInit);
+        }
 
-        var nextInit = Object.assign({}, init, { body: patchBody(reqUrl, init.body) });
-        return originalFetch(input, nextInit);
+        // Some app paths call fetch(Request) rather than fetch(url, init).
+        // In that case we need to clone and patch the request body ourselves.
+        if (!init && input && typeof input.clone === "function" && typeof input.text === "function") {
+          return input.clone().text().then(function (bodyText) {
+            if (typeof bodyText !== "string" || !bodyText) return originalFetch(input);
+            var patchedBody = patchBody(reqUrl, bodyText);
+            if (patchedBody === bodyText) return originalFetch(input);
+            var reqInit = {
+              method: input.method,
+              headers: new Headers(input.headers || {}),
+              body: patchedBody,
+              mode: input.mode,
+              credentials: input.credentials,
+              cache: input.cache,
+              redirect: input.redirect,
+              referrer: input.referrer,
+              referrerPolicy: input.referrerPolicy,
+              integrity: input.integrity,
+              keepalive: input.keepalive,
+              signal: input.signal,
+            };
+            return originalFetch(new Request(input.url, reqInit));
+          }).catch(function () {
+            return originalFetch(input, init);
+          });
+        }
+
+        return originalFetch(input, init);
       };
 
       scanAndEnhanceDateInputs();
