@@ -1,6 +1,4 @@
-import { json, corsPreflight, readList, writeList, requireAdmin, uuid, nowIso, STORE_KEYS, touchLastEdited, safe } from "../_shared.js";
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+import { json, corsPreflight, readList, writeList, requireAdmin, uuid, nowIso, STORE_KEYS, touchLastEdited, safe, normalizeSnapshotDateInput } from "../_shared.js";
 
 export async function onRequestOptions() { return corsPreflight(); }
 
@@ -13,12 +11,11 @@ export const onRequestPost = safe(async ({ request, env }) => {
   if (!category_id || !old_date || !new_date) {
     return json({ detail: "category_id, old_date and new_date required" }, 400);
   }
-  if (!DATE_RE.test(old_date) || !DATE_RE.test(new_date)) {
-    return json({ detail: "Invalid date format, use YYYY-MM-DD" }, 400);
-  }
   if (!priceMap || typeof priceMap !== "object") {
     return json({ detail: "prices object required" }, 400);
   }
+  const normalizedNewDate = normalizeSnapshotDateInput(new_date);
+  if (!normalizedNewDate) return json({ detail: "Invalid new snapshot date" }, 400);
   const [items, prices] = await Promise.all([
     readList(env, STORE_KEYS.ITEMS),
     readList(env, STORE_KEYS.PRICES),
@@ -35,11 +32,11 @@ export const onRequestPost = safe(async ({ request, env }) => {
     const num = Number(raw);
     if (!Number.isFinite(num)) continue;
     // Remove any existing entry at new_date for this item, then insert fresh
-    next = next.filter((p) => !(p.item_id === itemId && p.date === new_date));
-    next.push({ id: uuid(), item_id: itemId, date: new_date, price: num, created_at: nowIso() });
+    next = next.filter((p) => !(p.item_id === itemId && p.date === normalizedNewDate));
+    next.push({ id: uuid(), item_id: itemId, date: normalizedNewDate, price: num, created_at: nowIso() });
     affected += 1;
   }
   await writeList(env, STORE_KEYS.PRICES, next);
   await touchLastEdited(env);
-  return json({ affected, old_date, new_date });
+  return json({ affected, old_date, new_date: normalizedNewDate });
 });
