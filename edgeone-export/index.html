@@ -490,169 +490,45 @@
     (function () {
       if (window.location.pathname !== "/admin") return;
 
-      var LS_ENABLED = "abi_manual_snapshot_time_enabled";
-      var LS_TIME = "abi_manual_snapshot_time";
-      var LS_TZ = "abi_manual_snapshot_timezone";
+      function upgradeDateInput(input) {
+        if (!input || input.dataset.snapshotDateUpgraded === "1") return;
+        input.dataset.snapshotDateUpgraded = "1";
 
-      function readState() {
-        var enabled = false;
-        var time = "";
-        var timezone = "";
-        try {
-          enabled = window.localStorage.getItem(LS_ENABLED) === "1";
-          time = (window.localStorage.getItem(LS_TIME) || "").trim();
-          timezone = (window.localStorage.getItem(LS_TZ) || "").trim();
-        } catch (e) {}
-        return { enabled: enabled, time: time, timezone: timezone };
-      }
+        var currentValue = (input.value || "").trim();
+        input.type = "text";
+        input.placeholder = "YYYY-MM-DD or YYYY-MM-DD 6pm UTC+02:00";
+        input.title = "You can enter full snapshot label, e.g. 2026-05-01 6pm UTC+02:00";
+        input.autocomplete = "off";
+        input.removeAttribute("min");
+        input.removeAttribute("max");
+        input.removeAttribute("step");
 
-      function writeState(state) {
-        try {
-          window.localStorage.setItem(LS_ENABLED, state.enabled ? "1" : "0");
-          window.localStorage.setItem(LS_TIME, state.time || "");
-          window.localStorage.setItem(LS_TZ, state.timezone || "");
-        } catch (e) {}
-      }
+        if (currentValue) input.value = currentValue;
 
-      function cardBase(el) {
-        el.style.position = "fixed";
-        el.style.right = "12px";
-        el.style.bottom = "12px";
-        el.style.width = "min(320px, calc(100vw - 24px))";
-        el.style.padding = "10px";
-        el.style.zIndex = "10001";
-        el.style.background = "rgba(8, 9, 10, 0.92)";
-        el.style.border = "1px solid rgba(255, 255, 255, 0.14)";
-        el.style.borderRadius = "10px";
-        el.style.boxShadow = "0 6px 18px rgba(0,0,0,0.3)";
-        el.style.color = "#EDEDED";
-        el.style.fontFamily = "Arial, sans-serif";
-      }
-
-      function inputBase(el) {
-        el.style.width = "100%";
-        el.style.padding = "7px";
-        el.style.borderRadius = "6px";
-        el.style.border = "1px solid #3A3A3A";
-        el.style.background = "#0F1115";
-        el.style.color = "#F2F2F2";
-      }
-
-      function mountPanel() {
-        var state = readState();
-        var panel = document.createElement("div");
-        cardBase(panel);
-
-        var title = document.createElement("div");
-        title.textContent = "Snapshot time override";
-        title.style.fontWeight = "700";
-        title.style.marginBottom = "8px";
-
-        var enabledLabel = document.createElement("label");
-        enabledLabel.style.display = "flex";
-        enabledLabel.style.gap = "6px";
-        enabledLabel.style.alignItems = "center";
-        enabledLabel.style.fontSize = "12px";
-        enabledLabel.style.marginBottom = "8px";
-        var enabledInput = document.createElement("input");
-        enabledInput.type = "checkbox";
-        enabledInput.checked = state.enabled;
-        enabledLabel.appendChild(enabledInput);
-        enabledLabel.appendChild(document.createTextNode("Use manual time/timezone"));
-
-        var timeInput = document.createElement("input");
-        timeInput.placeholder = "Time (e.g. 2pm or 2:30pm)";
-        timeInput.value = state.time;
-        inputBase(timeInput);
-
-        var timezoneInput = document.createElement("input");
-        timezoneInput.placeholder = "Timezone (e.g. UTC+02:00)";
-        timezoneInput.value = state.timezone;
-        timezoneInput.style.marginTop = "6px";
-        inputBase(timezoneInput);
-
-        var note = document.createElement("div");
-        note.textContent = "Applied to new snapshot uploads and snapshot edits.";
-        note.style.fontSize = "11px";
-        note.style.color = "#A0A0A0";
-        note.style.marginTop = "8px";
-
-        function save() {
-          writeState({
-            enabled: !!enabledInput.checked,
-            time: timeInput.value.trim(),
-            timezone: timezoneInput.value.trim(),
-          });
+        var parent = input.parentElement;
+        if (parent && !parent.querySelector("[data-snapshot-date-hint='1']")) {
+          var hint = document.createElement("div");
+          hint.dataset.snapshotDateHint = "1";
+          hint.textContent = "Date supports time/timezone too (e.g. 2026-05-01 6pm UTC+02:00)";
+          hint.style.fontSize = "11px";
+          hint.style.color = "#A0A0A0";
+          hint.style.marginTop = "4px";
+          parent.appendChild(hint);
         }
-
-        enabledInput.addEventListener("change", save);
-        timeInput.addEventListener("input", save);
-        timezoneInput.addEventListener("input", save);
-
-        panel.appendChild(title);
-        panel.appendChild(enabledLabel);
-        panel.appendChild(timeInput);
-        panel.appendChild(timezoneInput);
-        panel.appendChild(note);
-        document.body.appendChild(panel);
       }
 
-      function shouldPatchRequest(url, method) {
-        if (method !== "POST") return false;
-        return (
-          url.indexOf("/api/price-points") >= 0 ||
-          url.indexOf("/api/price-points/bulk") >= 0 ||
-          url.indexOf("/api/price-points/edit-snapshot") >= 0
-        );
+      function scanAndUpgradeDateInputs() {
+        var inputs = document.querySelectorAll("input[type='date']");
+        inputs.forEach(upgradeDateInput);
       }
 
-      function patchBody(url, bodyText) {
-        var state = readState();
-        if (!state.enabled || !state.time || !state.timezone) return bodyText;
-        var body;
-        try {
-          body = JSON.parse(bodyText);
-        } catch (e) {
-          return bodyText;
-        }
-        if (!body || typeof body !== "object") return bodyText;
-        if (url.indexOf("/api/price-points/edit-snapshot") >= 0) {
-          body.new_time = state.time;
-          body.new_timezone = state.timezone;
-        } else {
-          body.time = state.time;
-          body.timezone = state.timezone;
-        }
-        return JSON.stringify(body);
-      }
+      scanAndUpgradeDateInputs();
+      setInterval(scanAndUpgradeDateInputs, 1000);
 
-      var originalFetch = window.fetch.bind(window);
-      window.fetch = function (input, init) {
-        var reqUrl = "";
-        if (typeof input === "string") reqUrl = input;
-        else if (input && input.url) reqUrl = input.url;
-
-        var method = "GET";
-        if (init && init.method) method = String(init.method).toUpperCase();
-        else if (input && input.method) method = String(input.method).toUpperCase();
-
-        if (!shouldPatchRequest(reqUrl, method)) {
-          return originalFetch(input, init);
-        }
-
-        if (!init || typeof init.body !== "string") {
-          return originalFetch(input, init);
-        }
-
-        var patchedBody = patchBody(reqUrl, init.body);
-        if (patchedBody === init.body) {
-          return originalFetch(input, init);
-        }
-        var nextInit = Object.assign({}, init, { body: patchedBody });
-        return originalFetch(input, nextInit);
-      };
-
-      mountPanel();
+      var observer = new MutationObserver(function () {
+        scanAndUpgradeDateInputs();
+      });
+      observer.observe(document.documentElement, { childList: true, subtree: true });
     })();
   </script>
 </body>
