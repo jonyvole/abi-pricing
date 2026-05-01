@@ -94,6 +94,8 @@ export function nowIso() {
 
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const SNAPSHOT_LABEL_RE = /^(\d{4}-\d{2}-\d{2})\s+(\d{1,2})(?::(00|30))?(am|pm)\s+(UTC[+-]\d{2}:\d{2})$/i;
+const TIME_INPUT_RE = /^(\d{1,2})(?::(00|30))?(am|pm)$/i;
+const TIMEZONE_INPUT_RE = /^UTC[+-]\d{2}:\d{2}$/i;
 
 function pad2(n) {
   return String(n).padStart(2, "0");
@@ -139,10 +141,40 @@ export function formatSnapshotDateLabel(dateOnly, now = new Date()) {
   return `${dateOnly} ${timeLabel(rounded)} ${timezoneLabel(rounded)}`;
 }
 
-export function normalizeSnapshotDateInput(input, now = new Date()) {
+function normalizeManualTime(input) {
   const value = String(input || "").trim();
   if (!value) return "";
-  if (DATE_ONLY_RE.test(value)) return formatSnapshotDateLabel(value, now);
+  const m = value.match(TIME_INPUT_RE);
+  if (!m) return "";
+  const hour = Number(m[1]);
+  if (hour < 1 || hour > 12) return "";
+  const minutes = m[2] || "00";
+  const suffix = m[3].toLowerCase();
+  return minutes === "00" ? `${hour}${suffix}` : `${hour}:${minutes}${suffix}`;
+}
+
+function normalizeManualTimezone(input) {
+  const value = String(input || "").trim();
+  if (!value) return "";
+  if (!TIMEZONE_INPUT_RE.test(value)) return "";
+  const m = value.match(/^UTC([+-])(\d{2}):(\d{2})$/i);
+  if (!m) return "";
+  const sign = m[1];
+  const hh = Number(m[2]);
+  const mm = Number(m[3]);
+  if (hh > 14 || mm > 59) return "";
+  return `UTC${sign}${pad2(hh)}:${pad2(mm)}`;
+}
+
+export function normalizeSnapshotDateInput(input, now = new Date(), options = {}) {
+  const value = String(input || "").trim();
+  if (!value) return "";
+  if (DATE_ONLY_RE.test(value)) {
+    const manualTime = normalizeManualTime(options && options.time);
+    const manualTimezone = normalizeManualTimezone(options && options.timezone);
+    if (manualTime && manualTimezone) return `${value} ${manualTime} ${manualTimezone}`;
+    return formatSnapshotDateLabel(value, now);
+  }
   return value;
 }
 
