@@ -7,14 +7,14 @@ export const onRequestPost = safe(async ({ request, env }) => {
   if (unauth) return unauth;
   let body;
   try { body = await request.json(); } catch { return json({ detail: "Invalid JSON" }, 400); }
-  const { category_id, old_date, new_date, prices: priceMap } = body || {};
+  const { category_id, old_date, new_date, new_time, new_timezone, prices: priceMap } = body || {};
   if (!category_id || !old_date || !new_date) {
     return json({ detail: "category_id, old_date and new_date required" }, 400);
   }
   if (!priceMap || typeof priceMap !== "object") {
     return json({ detail: "prices object required" }, 400);
   }
-  const normalizedNewDate = normalizeSnapshotDateInput(new_date);
+  const normalizedNewDate = normalizeSnapshotDateInput(new_date, new Date(), { time: new_time, timezone: new_timezone });
   if (!normalizedNewDate) return json({ detail: "Invalid new snapshot date" }, 400);
   const [items, prices] = await Promise.all([
     readList(env, STORE_KEYS.ITEMS),

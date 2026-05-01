@@ -16,9 +16,9 @@ export const onRequestPost = safe(async ({ request, env }) => {
   if (unauth) return unauth;
   let body;
   try { body = await request.json(); } catch { return json({ detail: "Invalid JSON" }, 400); }
-  const { item_id, date, price } = body || {};
+  const { item_id, date, time, timezone, price } = body || {};
   if (!item_id || !date) return json({ detail: "item_id and date required" }, 400);
-  const snapshotDate = normalizeSnapshotDateInput(date);
+  const snapshotDate = normalizeSnapshotDateInput(date, new Date(), { time, timezone });
   if (!snapshotDate) return json({ detail: "Invalid snapshot date" }, 400);
   const items = await readList(env, STORE_KEYS.ITEMS);
   if (!items.find((it) => it.id === item_id)) return json({ detail: "Item not found" }, 404);
