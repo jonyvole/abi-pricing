@@ -490,16 +490,29 @@
     (function () {
       if (window.location.pathname !== "/admin") return;
 
-      var manualValues = { add: "", edit: "" };
+      var manualValues = { add: "", edit: "", last: "" };
 
-      function toIsoDate(dateText) {
-        var value = String(dateText || "").trim();
+      function normalizeManualValue(raw) {
+        var value = String(raw || "").trim().replace(/\s+/g, " ");
+        if (!value) return "";
+        var dmy = value.match(/^(\d{2})\/(\d{2})\/(\d{4})(.*)$/);
+        if (dmy) {
+          value = dmy[3] + "-" + dmy[2] + "-" + dmy[1] + dmy[4];
+        }
+        return value.trim();
+      }
+
+      function toIsoDate(value) {
         if (!value) return "";
         var m = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
         if (m) return m[1] + "-" + m[2] + "-" + m[3];
-        m = value.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
-        if (m) return m[3] + "-" + m[2] + "-" + m[1];
         return "";
+      }
+
+      function extractManualParts(value) {
+        var m = String(value || "").match(/^(\d{4}-\d{2}-\d{2})\s+(.+)\s+(UTC[+-]\d{2}:\d{2})$/i);
+        if (!m) return null;
+        return { date: m[1], time: m[2].trim(), timezone: m[3].toUpperCase() };
       }
 
       function classifyInput(input) {
@@ -551,8 +564,10 @@
         input.setAttribute("aria-hidden", "true");
 
         textInput.addEventListener("input", function () {
-          var manual = textInput.value.trim();
+          var manual = normalizeManualValue(textInput.value);
+          if (manual !== textInput.value.trim()) textInput.value = manual;
           manualValues[mode] = manual;
+          manualValues.last = manual;
           var iso = toIsoDate(manual);
           if (iso) {
             input.value = iso;
@@ -587,12 +602,36 @@
         }
         if (!body || typeof body !== "object") return bodyText;
 
+        var manual = "";
         if (url.indexOf("/api/price-points/edit-snapshot") >= 0) {
-          if (manualValues.edit) {
-            body.new_date = manualValues.edit;
+          manual = manualValues.edit || manualValues.last || "";
+        } else {
+          manual = manualValues.add || manualValues.last || "";
+        }
+        manual = normalizeManualValue(manual);
+        if (!manual) return bodyText;
+        var parts = extractManualParts(manual);
+
+        if (url.indexOf("/api/price-points/edit-snapshot") >= 0) {
+          if (parts) {
+            body.new_date = parts.date;
+            body.new_time = parts.time;
+            body.new_timezone = parts.timezone;
+          } else {
+            body.new_date = manual;
+            delete body.new_time;
+            delete body.new_timezone;
           }
-        } else if (manualValues.add) {
-          body.date = manualValues.add;
+        } else {
+          if (parts) {
+            body.date = parts.date;
+            body.time = parts.time;
+            body.timezone = parts.timezone;
+          } else {
+            body.date = manual;
+            delete body.time;
+            delete body.timezone;
+          }
         }
         return JSON.stringify(body);
       }
@@ -642,6 +681,25 @@
 
         return originalFetch(input, init);
       };
+
+      if (window.XMLHttpRequest && window.XMLHttpRequest.prototype) {
+        var originalOpen = window.XMLHttpRequest.prototype.open;
+        var originalSend = window.XMLHttpRequest.prototype.send;
+        window.XMLHttpRequest.prototype.open = function (method, url) {
+          this.__snapshotPatchMeta = {
+            method: String(method || "GET").toUpperCase(),
+            url: String(url || ""),
+          };
+          return originalOpen.apply(this, arguments);
+        };
+        window.XMLHttpRequest.prototype.send = function (body) {
+          var meta = this.__snapshotPatchMeta || {};
+          if (typeof body === "string" && shouldPatchRequest(meta.url || "", meta.method || "GET")) {
+            return originalSend.call(this, patchBody(meta.url, body));
+          }
+          return originalSend.apply(this, arguments);
+        };
+      }
 
       scanAndEnhanceDateInputs();
       setInterval(scanAndEnhanceDateInputs, 800);
