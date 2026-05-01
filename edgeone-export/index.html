@@ -490,43 +490,135 @@
     (function () {
       if (window.location.pathname !== "/admin") return;
 
-      function upgradeDateInput(input) {
-        if (!input || input.dataset.snapshotDateUpgraded === "1") return;
-        input.dataset.snapshotDateUpgraded = "1";
+      var manualValues = { add: "", edit: "" };
 
-        var currentValue = (input.value || "").trim();
-        input.type = "text";
-        input.placeholder = "YYYY-MM-DD or YYYY-MM-DD 6pm UTC+02:00";
-        input.title = "You can enter full snapshot label, e.g. 2026-05-01 6pm UTC+02:00";
-        input.autocomplete = "off";
-        input.removeAttribute("min");
-        input.removeAttribute("max");
-        input.removeAttribute("step");
+      function toIsoDate(dateText) {
+        var value = String(dateText || "").trim();
+        if (!value) return "";
+        var m = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (m) return m[1] + "-" + m[2] + "-" + m[3];
+        m = value.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+        if (m) return m[3] + "-" + m[2] + "-" + m[1];
+        return "";
+      }
 
-        if (currentValue) input.value = currentValue;
+      function classifyInput(input) {
+        var row = input && input.closest ? input.closest("tr") : null;
+        return row ? "edit" : "add";
+      }
 
-        var parent = input.parentElement;
-        if (parent && !parent.querySelector("[data-snapshot-date-hint='1']")) {
-          var hint = document.createElement("div");
-          hint.dataset.snapshotDateHint = "1";
-          hint.textContent = "Date supports time/timezone too (e.g. 2026-05-01 6pm UTC+02:00)";
-          hint.style.fontSize = "11px";
-          hint.style.color = "#A0A0A0";
-          hint.style.marginTop = "4px";
-          parent.appendChild(hint);
+      function ensureManualTextInput(input) {
+        if (!input || input.dataset.snapshotDateMirrorReady === "1") return;
+        input.dataset.snapshotDateMirrorReady = "1";
+
+        var mode = classifyInput(input);
+        var wrapper = document.createElement("div");
+        wrapper.style.display = "flex";
+        wrapper.style.flexDirection = "column";
+        wrapper.style.gap = "4px";
+        wrapper.style.width = "100%";
+        wrapper.style.minWidth = "170px";
+
+        var textInput = document.createElement("input");
+        textInput.type = "text";
+        textInput.placeholder = "YYYY-MM-DD 6pm UTC+02:00";
+        textInput.autocomplete = "off";
+        textInput.style.width = "100%";
+        textInput.style.padding = "8px";
+        textInput.style.borderRadius = "0";
+        textInput.style.border = "1px solid #ffd000";
+        textInput.style.background = "#0F1115";
+        textInput.style.color = "#F2F2F2";
+        textInput.style.fontFamily = "inherit";
+        textInput.style.fontSize = "inherit";
+        textInput.style.boxSizing = "border-box";
+        textInput.title = "Type full snapshot label: YYYY-MM-DD 6pm UTC+02:00";
+
+        var hint = document.createElement("div");
+        hint.textContent = "Custom snapshot date/time/timezone";
+        hint.style.fontSize = "11px";
+        hint.style.color = "#A0A0A0";
+        hint.style.lineHeight = "1.2";
+
+        var dateCell = input.parentElement;
+        if (!dateCell) return;
+        dateCell.insertBefore(wrapper, input);
+        wrapper.appendChild(textInput);
+        wrapper.appendChild(hint);
+
+        input.style.display = "none";
+        input.tabIndex = -1;
+        input.setAttribute("aria-hidden", "true");
+
+        textInput.addEventListener("input", function () {
+          var manual = textInput.value.trim();
+          manualValues[mode] = manual;
+          var iso = toIsoDate(manual);
+          if (iso) {
+            input.value = iso;
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+            input.dispatchEvent(new Event("change", { bubbles: true }));
+          }
+        });
+      }
+
+      function scanAndEnhanceDateInputs() {
+        var inputs = document.querySelectorAll("input[type='date']");
+        for (var i = 0; i < inputs.length; i += 1) {
+          ensureManualTextInput(inputs[i]);
         }
       }
 
-      function scanAndUpgradeDateInputs() {
-        var inputs = document.querySelectorAll("input[type='date']");
-        inputs.forEach(upgradeDateInput);
+      function shouldPatchRequest(url, method) {
+        if (method !== "POST") return false;
+        return (
+          url.indexOf("/api/price-points") >= 0 ||
+          url.indexOf("/api/price-points/bulk") >= 0 ||
+          url.indexOf("/api/price-points/edit-snapshot") >= 0
+        );
       }
 
-      scanAndUpgradeDateInputs();
-      setInterval(scanAndUpgradeDateInputs, 1000);
+      function patchBody(url, bodyText) {
+        var body;
+        try {
+          body = JSON.parse(bodyText);
+        } catch (e) {
+          return bodyText;
+        }
+        if (!body || typeof body !== "object") return bodyText;
+
+        if (url.indexOf("/api/price-points/edit-snapshot") >= 0) {
+          if (manualValues.edit) {
+            body.new_date = manualValues.edit;
+          }
+        } else if (manualValues.add) {
+          body.date = manualValues.add;
+        }
+        return JSON.stringify(body);
+      }
+
+      var originalFetch = window.fetch.bind(window);
+      window.fetch = function (input, init) {
+        var reqUrl = "";
+        if (typeof input === "string") reqUrl = input;
+        else if (input && input.url) reqUrl = input.url;
+
+        var method = "GET";
+        if (init && init.method) method = String(init.method).toUpperCase();
+        else if (input && input.method) method = String(input.method).toUpperCase();
+
+        if (!shouldPatchRequest(reqUrl, method)) return originalFetch(input, init);
+        if (!init || typeof init.body !== "string") return originalFetch(input, init);
+
+        var nextInit = Object.assign({}, init, { body: patchBody(reqUrl, init.body) });
+        return originalFetch(input, nextInit);
+      };
+
+      scanAndEnhanceDateInputs();
+      setInterval(scanAndEnhanceDateInputs, 800);
 
       var observer = new MutationObserver(function () {
-        scanAndUpgradeDateInputs();
+        scanAndEnhanceDateInputs();
       });
       observer.observe(document.documentElement, { childList: true, subtree: true });
     })();
