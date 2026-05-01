@@ -1,4 +1,4 @@
-import { json, corsPreflight, readAll, ensureSeeded, safe } from "../_shared.js";
+import { json, corsPreflight, readAll, ensureSeeded, safe, compareSnapshotDates } from "../_shared.js";
 
 export async function onRequestOptions() { return corsPreflight(); }
 
@@ -16,6 +16,6 @@ export const onRequestGet = safe(async ({ env, params }) => {
     if (!row) { row = { date: p.date }; dateMap.set(p.date, row); }
     row[p.item_id] = p.price;
   }
-  const rows = Array.from(dateMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+  const rows = Array.from(dateMap.values()).sort((a, b) => compareSnapshotDates(a.date, b.date));
   return json({ items: catItems, rows });
 });
